@@ -8,7 +8,7 @@
 out
 gen### Gradle template
 .gradle
-/build/
+build
 gradlew.bat
 
 # Ignore Gradle GUI config
