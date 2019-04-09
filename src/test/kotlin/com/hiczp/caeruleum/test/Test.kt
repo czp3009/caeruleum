@@ -16,8 +16,8 @@ interface GithubAPI {
 @UseExperimental(KtorExperimentalAPI::class)
 fun main() {
     runBlocking {
-        HttpClient(CIO).get<String>("https://api.github.com/users/czp3009/repos").println()
+        HttpClient(CIO).get<String>("https://api.github.com").println()
     }
 }
 
-fun String.println() = println(this)
+private fun Any.println() = println(toString())
