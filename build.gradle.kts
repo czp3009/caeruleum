@@ -20,7 +20,10 @@ dependencies {
     implementation(kotlin("reflect"))
 }
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = Java.version
+    kotlinOptions {
+        jvmTarget = Java.version
+        freeCompilerArgs = listOf("-Xuse-experimental=kotlin.Experimental")
+    }
 }
 
 //cio
