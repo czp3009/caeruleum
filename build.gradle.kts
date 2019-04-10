@@ -12,6 +12,7 @@ description = "Retrofit inspired Http client base on CIO"
 
 repositories {
     mavenCentral()
+    maven("https://dl.bintray.com/kotlin/kotlinx/")
 }
 
 //kotlin
@@ -30,4 +31,10 @@ tasks.withType<KotlinCompile> {
 dependencies {
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
     implementation("io.ktor:ktor-client-cio:${Ktor.version}")
+}
+
+//test
+dependencies {
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-json
+    testImplementation("io.ktor:ktor-client-gson:${Ktor.version}")
 }
