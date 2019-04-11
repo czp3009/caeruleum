@@ -10,6 +10,7 @@ import kotlin.reflect.KClass
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.jvm.javaMethod
 import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.jvmErasure
 import kotlin.reflect.jvm.kotlinFunction
 
 @PublishedApi
@@ -24,17 +25,12 @@ inline fun <reified T> HttpClient.create(): T {
         if (method !in declaredMethods) return@newProxyInstance method.invoke(proxy, args)
 
         val kFunction = method.kotlinFunction!!
+        val returnType = kFunction.returnType
         if (kFunction.isSuspend) {
             val realArgs = args.copyOf(args.size - 1)
             val continuation = args.last() as Continuation<*>
             return@newProxyInstance runBlocking(continuation.context) {
-                val returnType = kFunction.returnType
-                call("https://api.github.com/").receive(
-                    TypeInfo(
-                        kFunction.returnType::class,
-                        kFunction.returnType.javaType
-                    )
-                )
+                call("https://api.github.com/").receive(TypeInfo(returnType.jvmErasure, returnType.javaType))
             }
         }
 
