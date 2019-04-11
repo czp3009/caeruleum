@@ -37,4 +37,8 @@ dependencies {
 dependencies {
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-json
     testImplementation("io.ktor:ktor-client-gson:${Ktor.version}")
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging
+    testImplementation("io.ktor:ktor-client-logging-jvm:${Ktor.version}")
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
+    testImplementation("org.slf4j:slf4j-simple:1.7.26")
 }
