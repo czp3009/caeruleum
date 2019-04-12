@@ -19,12 +19,20 @@ import kotlinx.coroutines.runBlocking
 
 @Suppress("DeferredIsResult")
 @BaseUrl("https://api.github.com/")
-interface GithubAPI {
+interface GithubService {
     @Get
-    suspend fun index(): JsonElement
+    suspend fun noReturnValue()
+
+    @Get
+    suspend fun withReturnValue(): Deferred<JsonElement>
 
     @Get("users/{user}/repos")
-    fun listRepos(@Path user: String): Deferred<JsonElement>
+    fun withPathVariable(@Path user: String): Deferred<JsonElement>
+
+    fun nonAbstract() = "hello"
+
+    @JvmDefault
+    fun jvmDefault() = "hello"
 }
 
 @UseExperimental(KtorExperimentalAPI::class)
@@ -38,12 +46,14 @@ fun main() {
             level = LogLevel.ALL
         }
     }
-
-    val githubAPI = httpClient.create<GithubAPI>()
+//    runBlocking {
+//        httpClient.get<List<*>>("https://api.github.com/users/czp3009/repos").println()
+//    }
+    val githubAPI = httpClient.create<GithubService>()
 
     runBlocking {
         //githubAPI.index().println()
-        githubAPI.listRepos("czp3009").await().println()
+        githubAPI.withPathVariable("czp3009").await().println()
     }
 
     httpClient.close()

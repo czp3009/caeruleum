@@ -23,7 +23,10 @@ dependencies {
 tasks.withType<KotlinCompile> {
     kotlinOptions {
         jvmTarget = Java.version
-        freeCompilerArgs = listOf("-Xuse-experimental=kotlin.Experimental")
+        freeCompilerArgs = listOf(
+            "-Xuse-experimental=kotlin.Experimental",
+            "-Xjvm-default=enable"
+        )
     }
 }
 
