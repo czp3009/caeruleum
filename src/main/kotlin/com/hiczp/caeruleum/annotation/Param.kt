@@ -36,11 +36,11 @@ annotation class FieldMap(val encoded: Boolean = false)
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class Part(val value: String = "", val encoding: String = "binary")
+annotation class Part(val value: String = "")
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class PartMap(val encoding: String = "binary")
+annotation class PartMap
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)

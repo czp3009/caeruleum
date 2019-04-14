@@ -1,71 +1,274 @@
 package com.hiczp.caeruleum
 
 import com.hiczp.caeruleum.annotation.*
+import com.hiczp.caeruleum.annotation.Headers
+import com.hiczp.caeruleum.annotation.Url
+import io.ktor.client.call.TypeInfo
 import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.http.HttpMethod
-import kotlinx.coroutines.Deferred
+import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.forms.FormPart
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
+import io.ktor.http.*
+import io.ktor.util.appendAll
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
-import kotlin.reflect.full.createType
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.full.starProjectedType
+import kotlin.reflect.full.*
+import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.jvmErasure
 
 private val jobType = Job::class.createType()
-private val deferredType = Deferred::class.starProjectedType
+private val mapType = Map::class.starProjectedType
+private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
 
-class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
-    lateinit var httpMethod: HttpMethod
-    lateinit var url: String
-    var headers = emptyArray<String>()
-    var isFormUrlEncoded = false
-    var isMultipart = false
+internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
+    private lateinit var httpMethod: HttpMethod
+    private var isFormUrlEncoded = false
+    private var isMultipart = false
+    private val valueParameters = kFunction.valueParameters
     val isSuspend = kFunction.isSuspend
-    val returnType = kFunction.returnType
-    val isReturnJob = returnType.isSubtypeOf(jobType).also {
-        if (!it) throw IllegalArgumentException("Service functions must return $jobType")
+    val returnTypeInfo = with(kFunction.returnType) {
+        if (!isSubtypeOf(jobType)) error("Service functions must return $jobType")
+        if (arguments.isEmpty()) {
+            anyTypeInfo
+        } else {
+            arguments[0].type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
+        }
     }
-    val isReturnDeferred = returnType.isSubtypeOf(deferredType)
+    private val actions = Array(valueParameters.size) { mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>() }
+    private val defaultHttpRequestBuilder = HttpRequestBuilder()
 
     init {
-        var particlePath: String
+        var particlePath = ""
+        var httpMethodInitialized = false
+        fun parseHttpMethodAndPath(httpMethod: HttpMethod, path: String) {
+            if (httpMethodInitialized) error("Only one HTTP method is allowed")
+            this.httpMethod = httpMethod
+            particlePath = path
+            httpMethodInitialized = true
+        }
+
+        val headers = HeadersBuilder()
+
         kFunction.annotations.forEach {
             when (it) {
-                is Get -> {
-                    httpMethod = HttpMethod.Get;particlePath = it.value
+                is Get -> parseHttpMethodAndPath(HttpMethod.Get, it.value)
+                is Post -> parseHttpMethodAndPath(HttpMethod.Post, it.value)
+                is Put -> parseHttpMethodAndPath(HttpMethod.Put, it.value)
+                is Patch -> parseHttpMethodAndPath(HttpMethod.Patch, it.value)
+                is Delete -> parseHttpMethodAndPath(HttpMethod.Delete, it.value)
+                is Head -> parseHttpMethodAndPath(HttpMethod.Head, it.value)
+                is Options -> parseHttpMethodAndPath(HttpMethod.Options, it.value)
+                is Headers -> {
+                    it.value.forEach { header ->
+                        val colon = header.indexOf(':')
+                        if (colon == -1 || colon == 0 || colon == header.length - 1) {
+                            error("@Headers value must be in the form 'Name: Value'")
+                        }
+                        headers.append(
+                            header.substring(0, colon),
+                            header.substring(colon + 1).trim()
+                        )
+                    }
                 }
-                is Post -> {
-                    httpMethod = HttpMethod.Post;particlePath = it.value
+                is FormUrlEncoded -> {
+                    if (isMultipart) error("Only one encoding annotation is allowed")
+                    isFormUrlEncoded = true
                 }
-                is Put -> {
-                    httpMethod = HttpMethod.Put;particlePath = it.value
+                is Multipart -> {
+                    if (isFormUrlEncoded) error("Only one encoding annotation is allowed")
+                    isMultipart = true
                 }
-                is Patch -> {
-                    httpMethod = HttpMethod.Patch;particlePath = it.value
-                }
-                is Delete -> {
-                    httpMethod = HttpMethod.Delete;particlePath = it.value
-                }
-                is Head -> {
-                    httpMethod = HttpMethod.Head;particlePath = it.value
-                }
-                is Options -> {
-                    httpMethod = HttpMethod.Options;particlePath = it.value
-                }
-                is Headers -> headers = it.value
-                is FormUrlEncoded -> isFormUrlEncoded = true
-                is Multipart -> isMultipart = true
             }
         }
-        if (!::httpMethod.isInitialized)
-            throw IllegalArgumentException("No HttpMethod Designated")
-        if (isFormUrlEncoded && isMultipart)
-            throw IllegalArgumentException("Body cannot be FormUrlEncoded and Multipart at same time")
+        if (!httpMethodInitialized) error("HTTP method annotation is required")
 
-        val baseUrl = kClass.findAnnotation<BaseUrl>()?.value ?: ""
+        var gotUrl = false
+        var gotPath = false
+        var gotQuery = false
+        var gotQueryMap = false
+        var gotBody = false
+        valueParameters.forEachIndexed { index, kParameter ->
+            fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
+
+            kParameter.annotations.forEach { annotation ->
+                when (annotation) {
+                    is Url -> {
+                        if (gotUrl) error("Multiple @Url method annotations found")
+                        if (gotPath) error("@Path parameters may not be used with @Url")
+                        if (gotQuery || gotQueryMap) error("A @Url parameter must not come after @Query or @QueryMap")
+                        if (particlePath.isNotEmpty()) error("@Url cannot be used with ${httpMethod.value} URL")
+                        gotUrl = true
+                        actions[index].add { value ->
+                            url.takeFrom(value.toString())
+                        }
+                    }
+
+                    is Path -> {
+                        if (gotQuery || gotQueryMap) error("A @Path parameter must not come after a @Query or @QueryMap")
+                        if (gotUrl) error("@Path parameters may not be used with @Url")
+                        if (particlePath.isEmpty()) error("@Path can only be used with relative url on ${httpMethod.value}")
+                        gotPath = true
+                        val name = "{${annotation.value.orParameterName()}}"
+                        val encoded = annotation.encoded
+                        actions[index].add { value ->
+                            url.encodedPath = url.encodedPath.replace(
+                                name,
+                                value.toString().let { if (encoded) it else it.encodeURLPath() }
+                            )
+                        }
+                    }
+
+                    is Header -> {
+                        val name = annotation.value.orParameterName()
+                        actions[index].add { value ->
+                            headers.append(name, value.toString())
+                        }
+                    }
+
+                    is HeaderMap -> {
+                        if (!kParameter.type.isSubtypeOf(mapType)) {
+                            error("@HeaderMap parameter type must be Map")
+                        }
+                        actions[index].add { value ->
+                            (value as Map<*, *>).forEach { (headerName, headerValue) ->
+                                if (headerName != null && headerValue != null) {
+                                    headers.append(headerName.toString(), headerValue.toString())
+                                }
+                            }
+                        }
+                    }
+
+                    is Query -> {
+                        val name = annotation.value.orParameterName()
+                        val encoded = annotation.encoded
+                        gotQuery = true
+                        actions[index].add { value ->
+                            url.parameters.append(
+                                name,
+                                value.toString().let { if (encoded) it else it.encodeURLParameter() }
+                            )
+                        }
+                    }
+
+                    is QueryMap -> {
+                        if (!kParameter.type.isSubtypeOf(mapType)) {
+                            error("@QueryMap parameter type must be Map")
+                        }
+                        val encoded = annotation.encoded
+                        gotQueryMap = true
+                        actions[index].add { value ->
+                            (value as Map<*, *>).forEach { (queryParamName, queryParamValue) ->
+                                if (queryParamName != null && queryParamValue != null) {
+                                    url.parameters.append(
+                                        queryParamName.toString(),
+                                        queryParamValue.toString().let { if (encoded) it else it.encodeURLParameter() }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is Field -> {
+                        if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
+                        val name = annotation.value.orParameterName()
+                        val encoded = annotation.encoded
+                        actions[index].add { value ->
+                            (body as ParametersBuilder).append(
+                                name,
+                                value.toString()
+                            )
+                        }
+                    }
+
+                    is FieldMap -> {
+                        if (!isFormUrlEncoded) error("@FieldMap parameters can only be used with form encoding")
+                        if (!kParameter.type.isSubtypeOf(mapType)) {
+                            error("@FieldMap parameters can only be used with form encoding")
+                        }
+                        val encoded = annotation.encoded
+                        actions[index].add { value ->
+                            val body = body as ParametersBuilder
+                            (value as Map<*, *>).forEach { (fieldName, fieldValue) ->
+                                if (fieldName != null && fieldValue != null) {
+                                    body.append(fieldName.toString(), fieldValue.toString())
+                                }
+                            }
+                        }
+                    }
+
+                    is Part -> {
+                        if (!isMultipart) error("@Part parameters can only be used with multipart encoding")
+                        val name = annotation.value.orParameterName()
+                        actions[index].add { value ->
+                            @Suppress("UNCHECKED_CAST")
+                            (body as MutableList<FormPart<*>>).add(FormPart(name, value))
+                        }
+                    }
+
+                    is PartMap -> {
+                        if (!isMultipart) throw  IllegalArgumentException("@PartMap parameters can only be used with multipart encoding")
+                        if (!kParameter.type.isSubtypeOf(mapType)) {
+                            error("@FieldMap parameter type must be Map")
+                        }
+                        actions[index].add { value ->
+                            @Suppress("UNCHECKED_CAST")
+                            val body = body as MutableList<FormPart<*>>
+                            (value as Map<*, *>).forEach { (partName, partValue) ->
+                                if (partName != null && partValue != null) {
+                                    body.add(FormPart(partName.toString(), partValue))
+                                }
+                            }
+                        }
+                    }
+
+                    is Body -> {
+                        if (isFormUrlEncoded || isMultipart) error("@Body parameters cannot be used with form or multi-part encoding")
+                        if (gotBody) error("Multiple @Body method annotations found")
+                        gotBody = true
+                        actions[index].add { value ->
+                            body = value
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!gotBody) {
+            if (isMultipart) error("Multipart can only be specified on HTTP methods with request body")
+            if (isFormUrlEncoded) error("FormUrlEncoded can only be specified on HTTP methods with request body")
+        }
+
+        defaultHttpRequestBuilder.apply {
+            this.headers.appendAll(headers)
+            url.takeFrom(
+                URLBuilder(kClass.findAnnotation<BaseUrl>()?.value ?: "").apply {
+                    if (particlePath.isNotEmpty()) {
+                        if (particlePath.startsWith('/')) {
+                            encodedPath = particlePath
+                        } else {
+                            encodedPath += particlePath
+                        }
+                    }
+                }
+            )
+        }
     }
 
-    fun httpRequestBuilder() =
-        HttpRequestBuilder()
+    fun httpRequestBuilder(args: Array<Any?>) =
+        HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
+            if (isFormUrlEncoded) body = ParametersBuilder()
+            if (isMultipart) body = mutableListOf<FormPart<*>>()
+            args.forEachIndexed { index, arg ->
+                if (arg != null) {
+                    actions[index].forEach {
+                        this.it(arg)
+                    }
+                }
+            }
+            if (isFormUrlEncoded) body = FormDataContent((body as ParametersBuilder).build())
+            @Suppress("UNCHECKED_CAST")
+            if (isMultipart) body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))
+        }
 }

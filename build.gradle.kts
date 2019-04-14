@@ -38,10 +38,16 @@ dependencies {
 
 //test
 dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-json
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
     testImplementation("io.ktor:ktor-client-gson:${Ktor.version}")
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging
+    // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson
+    testImplementation("com.github.salomonbrys.kotson:kotson:2.5.0")
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging-jvm
     testImplementation("io.ktor:ktor-client-logging-jvm:${Ktor.version}")
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
     testImplementation("org.slf4j:slf4j-simple:1.7.26")
+    // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
+    testImplementation("org.junit.jupiter:junit-jupiter:5.4.1")
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
+    testImplementation("io.ktor:ktor-client-mock-jvm:${Ktor.version}")
 }
