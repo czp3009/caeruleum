@@ -16,15 +16,26 @@ private val serviceFunctionCache = ConcurrentHashMap<Method, ServiceFunction>()
 
 @PublishedApi
 internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
+    val javaClass = kClass.java
+    if (!javaClass.isInterface) throw IllegalArgumentException("API declarations must be interfaces")
+    if (javaClass.interfaces.isNotEmpty()) throw IllegalArgumentException("API interfaces must not extend other interfaces")
+
     //non-extension, non-static, abstract method
     val declaredAbstractMethods = kClass.declaredMemberFunctions
         .filter { it.isAbstract }
         .mapNotNull { it.javaMethod }
         .toHashSet()
-    return Proxy.newProxyInstance(kClass.java.classLoader, arrayOf(kClass.java)) { proxy, method, args ->
-        if (method !in declaredAbstractMethods) return@newProxyInstance method.invoke(proxy, args)
 
-        val serviceFunction = serviceFunctionCache.getOrPut(method) { ServiceFunction(kClass, method.kotlinFunction!!) }
+    return Proxy.newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
+        //if isSynthetic
+        val kFunction = method.kotlinFunction ?: return@newProxyInstance method.invoke(proxy, *args.orEmpty())
+
+        //non-abstract
+        if (!kFunction.isAbstract) {
+            return@newProxyInstance method.invoke(proxy, *args.orEmpty())
+        }
+
+        val serviceFunction = serviceFunctionCache.getOrPut(method) { ServiceFunction(kClass, kFunction) }
         val realArgs = if (serviceFunction.isSuspend) args.copyOf(args.size - 1) else args ?: emptyArray()
         val coroutineContext = if (serviceFunction.isSuspend) {
             (args.last() as Continuation<*>).context

@@ -189,10 +189,10 @@ class Test {
         }
     }
 
-//    @Test
-//    fun nonAbstract()= service.nonAbstract().assert {
-//        this=="hello"
-//    }
+    @Test
+    fun nonAbstract() = service.nonAbstract().assert {
+        this == "hello"
+    }
 
     @AfterAll
     fun dispose() {
