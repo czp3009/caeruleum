@@ -14,7 +14,8 @@ import kotlin.reflect.jvm.kotlinFunction
 
 private val serviceFunctionCache = ConcurrentHashMap<Method, ServiceFunction>()
 
-fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
+@PublishedApi
+internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
     //non-extension, non-static, abstract method
     val declaredAbstractMethods = kClass.declaredMemberFunctions
         .filter { it.isAbstract }

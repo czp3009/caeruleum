@@ -21,8 +21,10 @@ val httpClient = HttpClient(CIO) {
 
 val githubService = httpClient.create<GitHubService>()
 
-runBlocking {
-    githubSerivce.listRepos("czp3009").await()
+fun main() {
+    runBlocking {
+        githubService.listRepos("czp3009").await()
+    }
 }
 ```
 

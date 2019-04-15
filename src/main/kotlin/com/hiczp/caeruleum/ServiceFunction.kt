@@ -23,10 +23,8 @@ private val mapType = Map::class.starProjectedType
 private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
 
 internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
-    private lateinit var httpMethod: HttpMethod
     private var isFormUrlEncoded = false
     private var isMultipart = false
-    private val valueParameters = kFunction.valueParameters
     val isSuspend = kFunction.isSuspend
     val returnTypeInfo = with(kFunction.returnType) {
         if (!isSubtypeOf(jobType)) error("Service functions must return $jobType")
@@ -36,19 +34,18 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             arguments[0].type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
         }
     }
-    private val actions = Array(valueParameters.size) { mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>() }
+    private val actions =
+        Array(kFunction.valueParameters.size) { mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>() }
     private val defaultHttpRequestBuilder = HttpRequestBuilder()
 
     init {
+        var httpMethod: HttpMethod? = null
         var particlePath = ""
-        var httpMethodInitialized = false
-        fun parseHttpMethodAndPath(httpMethod: HttpMethod, path: String) {
-            if (httpMethodInitialized) error("Only one HTTP method is allowed")
-            this.httpMethod = httpMethod
+        fun parseHttpMethodAndPath(method: HttpMethod, path: String) {
+            if (httpMethod != null) error("Only one HTTP method is allowed")
+            httpMethod = method
             particlePath = path
-            httpMethodInitialized = true
         }
-
         val headers = HeadersBuilder()
 
         kFunction.annotations.forEach {
@@ -82,14 +79,14 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 }
             }
         }
-        if (!httpMethodInitialized) error("HTTP method annotation is required")
+        if (httpMethod == null) error("HTTP method annotation is required")
 
         var gotUrl = false
         var gotPath = false
         var gotQuery = false
         var gotQueryMap = false
         var gotBody = false
-        valueParameters.forEachIndexed { index, kParameter ->
+        kFunction.valueParameters.forEachIndexed { index, kParameter ->
             fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
 
             kParameter.annotations.forEach { annotation ->
@@ -98,7 +95,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         if (gotUrl) error("Multiple @Url method annotations found")
                         if (gotPath) error("@Path parameters may not be used with @Url")
                         if (gotQuery || gotQueryMap) error("A @Url parameter must not come after @Query or @QueryMap")
-                        if (particlePath.isNotEmpty()) error("@Url cannot be used with ${httpMethod.value} URL")
+                        if (particlePath.isNotEmpty()) error("@Url cannot be used with ${httpMethod!!.value} URL")
                         gotUrl = true
                         actions[index].add { value ->
                             url.takeFrom(value.toString())
@@ -108,7 +105,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     is Path -> {
                         if (gotQuery || gotQueryMap) error("A @Path parameter must not come after a @Query or @QueryMap")
                         if (gotUrl) error("@Path parameters may not be used with @Url")
-                        if (particlePath.isEmpty()) error("@Path can only be used with relative url on ${httpMethod.value}")
+                        if (particlePath.isEmpty()) error("@Path can only be used with relative url on ${httpMethod!!.value}")
                         gotPath = true
                         val name = "{${annotation.value.orParameterName()}}"
                         val encoded = annotation.encoded
@@ -235,13 +232,9 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             }
         }
 
-        if (!gotBody) {
-            if (isMultipart) error("Multipart can only be specified on HTTP methods with request body")
-            if (isFormUrlEncoded) error("FormUrlEncoded can only be specified on HTTP methods with request body")
-        }
-
         defaultHttpRequestBuilder.apply {
             this.headers.appendAll(headers)
+            method = httpMethod!!
             url.takeFrom(
                 URLBuilder(kClass.findAnnotation<BaseUrl>()?.value ?: "").apply {
                     if (particlePath.isNotEmpty()) {

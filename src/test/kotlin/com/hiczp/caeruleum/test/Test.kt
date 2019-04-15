@@ -1,21 +1,17 @@
 package com.hiczp.caeruleum.test
 
 import com.google.gson.JsonElement
-import com.hiczp.caeruleum.annotation.BaseUrl
-import com.hiczp.caeruleum.annotation.Get
-import com.hiczp.caeruleum.annotation.Path
-import com.hiczp.caeruleum.annotation.Query
+import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.create
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockHttpResponse
 import io.ktor.client.features.json.GsonSerializer
 import io.ktor.client.features.json.JsonFeature
-import io.ktor.client.features.logging.DEFAULT
 import io.ktor.client.features.logging.LogLevel
-import io.ktor.client.features.logging.Logger
 import io.ktor.client.features.logging.Logging
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.Deferred
@@ -35,6 +31,7 @@ val httpMockEngine = MockEngine {
         ByteReadChannel(
             json {
                 "header" to headers.toString()
+                "method" to method.value
                 "url" to url.toString()
                 "contentLength" to content.contentLength
             }.toString()
@@ -58,10 +55,30 @@ interface Service {
     @Get("users/{user}/repos")
     fun withPathVariable(@Path user: String): Deferred<JsonElement>
 
-    @Get
+    @Get("users")
     fun withQueryParam(@Query param1: String, @Query param2: String): Deferred<JsonElement>
 
+    @Post("user")
+    @FormUrlEncoded
+    fun postFormUrlEncoded(@Field arg1: String, @Field("czp") arg2: String? = null): Deferred<JsonElement>
+
+    @Post("user")
+    @FormUrlEncoded
+    fun postEmptyContent(): Deferred<JsonElement>
+
+    @Post("user")
+    @FormUrlEncoded
+    fun postWithMap(@FieldMap fieldMap: Map<String, String>): Deferred<JsonElement>
+
+    @Delete
+    fun delete(): Deferred<JsonElement>
+
+    @Post("user")
+    fun postWithoutBody(): Deferred<JsonElement>
+
     fun nonAbstract() = "hello"
+
+    suspend fun nonAbstractAndSuspend(arg1: String) = arg1
 
     @JvmDefault
     fun jvmDefault() = "hello"
@@ -75,7 +92,6 @@ class Test {
             serializer = GsonSerializer()
         }
         install(Logging) {
-            logger = Logger.DEFAULT
             level = LogLevel.ALL
         }
     }
@@ -115,9 +131,68 @@ class Test {
     @Test
     fun withQueryParam() = runBlocking {
         service.withQueryParam("czp1", "czp2").await().assert {
-            url == "$LOCALHOST?param1=czp1&param2=czp2"
+            url == LOCALHOST + "users?param1=czp1&param2=czp2"
         }
     }
+
+    @Test
+    fun postFormUrlEncoded() = runBlocking {
+        service.postFormUrlEncoded("01", "02").await().assert {
+            contentLength == "arg1=01&czp=02".length
+        }
+    }
+
+    @Test
+    fun repeatPost() = runBlocking {
+        service.postFormUrlEncoded("001", "002").await().assert {
+            contentLength == "arg1=001&czp=002".length
+        }
+    }
+
+    @Test
+    fun postWithNullValue() = runBlocking {
+        service.postFormUrlEncoded("01").await().assert {
+            contentLength == "arg1=01".length
+        }
+    }
+
+    @Test
+    fun postEmptyContent() = runBlocking {
+        service.postEmptyContent().await().assert {
+            contentLength == 0
+        }
+    }
+
+    @Test
+    fun postWithMap() = runBlocking {
+        service.postWithMap(
+            mapOf(
+                "arg1" to "02",
+                "arg2" to "01"
+            )
+        ).await().assert {
+            contentLength == "arg1=02&arg2=01".length
+        }
+    }
+
+    @Test
+    fun deleteMethod() = runBlocking {
+        service.delete().await().assert {
+            method == HttpMethod.Delete.value
+        }
+    }
+
+    @Test
+    fun postWithoutBody() = runBlocking {
+        service.postWithoutBody().await().assert {
+            contentLength == null
+        }
+    }
+
+//    @Test
+//    fun nonAbstract()= service.nonAbstract().assert {
+//        this=="hello"
+//    }
 
     @AfterAll
     fun dispose() {
