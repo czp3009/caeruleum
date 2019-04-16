@@ -30,6 +30,17 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
         //if isSynthetic
         val kFunction = method.kotlinFunction ?: return@newProxyInstance method.invoke(proxy, *args.orEmpty())
 
+        //method in Object
+        if (method.declaringClass == Any::class.java) {
+            return@newProxyInstance when (method.name) {
+                "equals" -> false
+                "hashCode" -> kClass.qualifiedName.hashCode()
+                "toString" -> "Service interface ${kClass.qualifiedName}"
+                else -> null    //Impossible
+            }
+        }
+
+        //TODO
         //non-abstract
         if (!kFunction.isAbstract) {
             return@newProxyInstance method.invoke(proxy, *args.orEmpty())
