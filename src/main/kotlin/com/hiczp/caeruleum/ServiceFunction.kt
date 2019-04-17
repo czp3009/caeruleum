@@ -10,6 +10,7 @@ import io.ktor.client.request.forms.FormPart
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.*
+import io.ktor.http.content.OutgoingContent
 import io.ktor.util.appendAll
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
@@ -46,6 +47,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             httpMethod = method
             particlePath = path
         }
+
         val headers = HeadersBuilder()
 
         kFunction.annotations.forEach {
@@ -108,11 +110,10 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         if (particlePath.isEmpty()) error("@Path can only be used with relative url on ${httpMethod!!.value}")
                         gotPath = true
                         val name = "{${annotation.value.orParameterName()}}"
-                        val encoded = annotation.encoded
                         actions[index].add { value ->
                             url.encodedPath = url.encodedPath.replace(
                                 name,
-                                value.toString().let { if (encoded) it else it.encodeURLPath() }
+                                value.toString().encodeURLPath()
                             )
                         }
                     }
@@ -139,12 +140,11 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
 
                     is Query -> {
                         val name = annotation.value.orParameterName()
-                        val encoded = annotation.encoded
                         gotQuery = true
                         actions[index].add { value ->
                             url.parameters.append(
                                 name,
-                                value.toString().let { if (encoded) it else it.encodeURLParameter() }
+                                value.toString()
                             )
                         }
                     }
@@ -153,14 +153,13 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         if (!kParameter.type.isSubtypeOf(mapType)) {
                             error("@QueryMap parameter type must be Map")
                         }
-                        val encoded = annotation.encoded
                         gotQueryMap = true
                         actions[index].add { value ->
                             (value as Map<*, *>).forEach { (queryParamName, queryParamValue) ->
                                 if (queryParamName != null && queryParamValue != null) {
                                     url.parameters.append(
                                         queryParamName.toString(),
-                                        queryParamValue.toString().let { if (encoded) it else it.encodeURLParameter() }
+                                        queryParamValue.toString()
                                     )
                                 }
                             }
@@ -170,7 +169,6 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     is Field -> {
                         if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
                         val name = annotation.value.orParameterName()
-                        val encoded = annotation.encoded
                         actions[index].add { value ->
                             (body as ParametersBuilder).append(
                                 name,
@@ -184,7 +182,6 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         if (!kParameter.type.isSubtypeOf(mapType)) {
                             error("@FieldMap parameters can only be used with form encoding")
                         }
-                        val encoded = annotation.encoded
                         actions[index].add { value ->
                             val body = body as ParametersBuilder
                             (value as Map<*, *>).forEach { (fieldName, fieldValue) ->
@@ -253,6 +250,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
             if (isFormUrlEncoded) body = ParametersBuilder()
             if (isMultipart) body = mutableListOf<FormPart<*>>()
+
             args.forEachIndexed { index, arg ->
                 if (arg != null) {
                     actions[index].forEach {
@@ -260,8 +258,14 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     }
                 }
             }
+
             if (isFormUrlEncoded) body = FormDataContent((body as ParametersBuilder).build())
             @Suppress("UNCHECKED_CAST")
             if (isMultipart) body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))
+
+            //jsonBody
+            if (body !is OutgoingContent && contentType() == null) {
+                contentType(ContentType.Application.Json)
+            }
         }
 }

@@ -8,7 +8,7 @@ annotation class Url
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class Path(val value: String = "", val encoded: Boolean = false)
+annotation class Path(val value: String = "")
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
@@ -20,19 +20,19 @@ annotation class HeaderMap
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class Query(val value: String = "", val encoded: Boolean = false)
+annotation class Query(val value: String = "")
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class QueryMap(val encoded: Boolean = false)
+annotation class QueryMap
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class Field(val value: String = "", val encoded: Boolean = false)
+annotation class Field(val value: String = "")
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class FieldMap(val encoded: Boolean = false)
+annotation class FieldMap
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)

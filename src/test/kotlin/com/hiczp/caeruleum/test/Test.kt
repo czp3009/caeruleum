@@ -1,6 +1,8 @@
 package com.hiczp.caeruleum.test
 
+import com.github.salomonbrys.kotson.jsonObject
 import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.create
 import io.ktor.client.HttpClient
@@ -76,12 +78,38 @@ interface Service {
     @Post("user")
     fun postWithoutBody(): Deferred<JsonElement>
 
-    fun nonAbstract() = "hello"
+    fun nonAbstract(arg1: String) = arg1
 
     suspend fun nonAbstractAndSuspend(arg1: String) = arg1
 
     @JvmDefault
-    fun jvmDefault() = "hello"
+    fun jvmDefault(arg1: String) = arg1
+
+    @JvmDefault
+    suspend fun jvmDefaultAndSuspend(arg1: String) = arg1
+
+    @Post
+    fun postJson(@Body body: JsonObject): Deferred<JsonElement>
+
+    @Get
+    fun url(@Url url: String, @Query arg1: String): Deferred<JsonElement>
+
+    @Get("user/{path}/repos")
+    fun pathWithSlash(@Path path: String): Deferred<JsonElement>
+
+    @Get
+    fun queryEncode(@Query arg1: String = "!"): Deferred<JsonElement>
+
+    @Post
+    @FormUrlEncoded
+    fun fieldEncode(
+        @FieldMap map: Map<String, String> = mapOf(
+            "param1" to "1 2!+/"
+        )
+    ): Deferred<JsonElement>
+
+    @Get
+    fun paramNullable(@Query arg: String?): Deferred<JsonElement>
 }
 
 @TestMethodOrder(NatureOrder::class)
@@ -109,57 +137,57 @@ class Test {
 
     @Test
     fun withReturnValue() = runBlocking {
-        service.withReturnValue().await().assert {
-            url == LOCALHOST
+        service.withReturnValue().await().url.assert {
+            LOCALHOST
         }
     }
 
     @Test
     fun withUrl() = runBlocking {
-        service.withUrl().await().assert {
-            url == LOCALHOST + "user"
+        service.withUrl().await().url.assert {
+            LOCALHOST + "user"
         }
     }
 
     @Test
     fun withPathVariable() = runBlocking {
-        service.withPathVariable("czp3009").await().assert {
-            url == LOCALHOST + "users/czp3009/repos"
+        service.withPathVariable("czp3009").await().url.assert {
+            LOCALHOST + "users/czp3009/repos"
         }
     }
 
     @Test
     fun withQueryParam() = runBlocking {
-        service.withQueryParam("czp1", "czp2").await().assert {
-            url == LOCALHOST + "users?param1=czp1&param2=czp2"
+        service.withQueryParam("czp1", "czp2").await().url.assert {
+            LOCALHOST + "users?param1=czp1&param2=czp2"
         }
     }
 
     @Test
     fun postFormUrlEncoded() = runBlocking {
-        service.postFormUrlEncoded("01", "02").await().assert {
-            contentLength == "arg1=01&czp=02".length
+        service.postFormUrlEncoded("01", "02").await().contentLength.assert {
+            "arg1=01&czp=02".length
         }
     }
 
     @Test
     fun repeatPost() = runBlocking {
-        service.postFormUrlEncoded("001", "002").await().assert {
-            contentLength == "arg1=001&czp=002".length
+        service.postFormUrlEncoded("001", "002").await().contentLength.assert {
+            "arg1=001&czp=002".length
         }
     }
 
     @Test
     fun postWithNullValue() = runBlocking {
-        service.postFormUrlEncoded("01").await().assert {
-            contentLength == "arg1=01".length
+        service.postFormUrlEncoded("01").await().contentLength.assert {
+            "arg1=01".length
         }
     }
 
     @Test
     fun postEmptyContent() = runBlocking {
-        service.postEmptyContent().await().assert {
-            contentLength == 0
+        service.postEmptyContent().await().contentLength.assert {
+            0
         }
     }
 
@@ -170,28 +198,92 @@ class Test {
                 "arg1" to "02",
                 "arg2" to "01"
             )
-        ).await().assert {
-            contentLength == "arg1=02&arg2=01".length
+        ).await().contentLength.assert {
+            "arg1=02&arg2=01".length
         }
     }
 
     @Test
     fun deleteMethod() = runBlocking {
-        service.delete().await().assert {
-            method == HttpMethod.Delete.value
+        service.delete().await().method.assert {
+            HttpMethod.Delete.value
         }
     }
 
     @Test
     fun postWithoutBody() = runBlocking {
-        service.postWithoutBody().await().assert {
-            contentLength == null
+        service.postWithoutBody().await().contentLength.assert {
+            null
         }
     }
 
     @Test
-    fun nonAbstract() = service.nonAbstract().assert {
-        this == "hello"
+    fun nonAbstract() = service.nonAbstract("hello").assert {
+        "hello"
+    }
+
+    @Test
+    fun nonAbstractAndSuspend() = runBlocking {
+        service.nonAbstractAndSuspend("hello").assert {
+            "hello"
+        }
+    }
+
+    @Test
+    fun jvmDefault() = service.jvmDefault("hello").assert {
+        "hello"
+    }
+
+    @Test
+    fun jvmDefaultAndSuspend() = runBlocking {
+        service.jvmDefaultAndSuspend("hello").assert {
+            "hello"
+        }
+    }
+
+    @Test
+    fun postJson() = runBlocking {
+        val jsonObject = jsonObject(
+            "key1" to "value1"
+        )
+        service.postJson(jsonObject).await().contentLength.assert {
+            jsonObject.toString().length
+        }
+    }
+
+    @Test
+    fun url() = runBlocking {
+        service.url("user", "value1").await().url.assert {
+            LOCALHOST + "user?arg1=value1"
+        }
+    }
+
+    @Test
+    fun pathWithSlash() = runBlocking {
+        service.pathWithSlash("a/b/c").await().url.assert {
+            LOCALHOST + "user/a/b/c/repos"
+        }
+    }
+
+    @Test
+    fun queryWithEncode() = runBlocking {
+        service.queryEncode().await().url.assert {
+            "$LOCALHOST?arg1=%21"
+        }
+    }
+
+    @Test
+    fun filedEncode() = runBlocking {
+        service.fieldEncode().await().contentLength.assert {
+            "param1=1+2%21%2B%2F".length
+        }
+    }
+
+    @Test
+    fun paramNullable() = runBlocking {
+        service.paramNullable(null).await().url.assert {
+            LOCALHOST
+        }
     }
 
     @AfterAll
