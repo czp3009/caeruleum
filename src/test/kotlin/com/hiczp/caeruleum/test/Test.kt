@@ -110,6 +110,13 @@ interface Service {
 
     @Get
     fun paramNullable(@Query arg: String?): Deferred<JsonElement>
+
+    companion object {
+        fun functionInCompanionObject(arg: String) = arg
+
+        @JvmStatic
+        fun jvmStatic(arg: String) = arg
+    }
 }
 
 @TestMethodOrder(NatureOrder::class)
@@ -123,7 +130,7 @@ class Test {
             level = LogLevel.ALL
         }
     }
-    lateinit var service: Service
+    private lateinit var service: Service
 
     @BeforeAll
     fun init() {
@@ -223,6 +230,11 @@ class Test {
     }
 
     @Test
+    fun repeatNonAbstract() = service.nonAbstract("hello2").assert {
+        "hello2"
+    }
+
+    @Test
     fun nonAbstractAndSuspend() = runBlocking {
         service.nonAbstractAndSuspend("hello").assert {
             "hello"
@@ -284,6 +296,18 @@ class Test {
         service.paramNullable(null).await().url.assert {
             LOCALHOST
         }
+    }
+
+    @Suppress("RemoveRedundantQualifierName")
+    @Test
+    fun functionInCompanionObject() = Service.functionInCompanionObject("hello").assert {
+        "hello"
+    }
+
+    @Suppress("RemoveRedundantQualifierName")
+    @Test
+    fun jvmStatic() = Service.jvmStatic("hello").assert {
+        "hello"
     }
 
     @AfterAll

@@ -14,6 +14,7 @@ import kotlin.reflect.jvm.kotlinFunction
 
 
 private val serviceFunctionCache = ConcurrentHashMap<Method, ServiceFunction>()
+private val nonAbstractKotlinFunctionCache = ConcurrentHashMap<Method, Method>()
 
 @PublishedApi
 internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
@@ -27,10 +28,10 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
 
         //non-abstract method
         if (!kFunction.isAbstract) {
-            //default method
-            return@newProxyInstance if (method.modifiers and (Modifier.ABSTRACT or Modifier.PUBLIC or Modifier.STATIC) == Modifier.PUBLIC) {
+            //non-abstract in JVM so that it's Default Method
+            return@newProxyInstance if (!Modifier.isAbstract(method.modifiers)) {
                 // Because the service interface might not be public, we need to use a MethodHandle lookup
-                // that ignores the visibility of the declaringClass.
+                // that ignores the visibility of the declaringClass
                 MethodHandles.Lookup::class.java.getDeclaredConstructor(
                     Class::class.java,
                     Int::class.javaPrimitiveType
@@ -40,23 +41,16 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                     .unreflectSpecial(method, javaClass)
                     .bindTo(proxy)
                     .invokeWithArguments(*args.orEmpty())
-            } else {    //non-abstract kotlin function in interface
-                val types = args.map { it::class.java }.let {
-                    if (kFunction.isSuspend) {
-                        it.toMutableList().apply {
-                            this[size - 1] = Continuation::class.java
-                        }
-                    } else {
-                        it
-                    }
-                }.toTypedArray()
-                javaClass.declaredClasses.find {
-                    it.simpleName == "DefaultImpls"
-                }!!.getDeclaredMethod(
-                    method.name,
-                    javaClass,
-                    *types
-                ).invoke(null, proxy, *args.orEmpty())
+            } else { //non-abstract kotlin function
+                nonAbstractKotlinFunctionCache.getOrPut(method) {
+                    javaClass.declaredClasses.find {
+                        it.simpleName == "DefaultImpls"
+                    }!!.getDeclaredMethod(
+                        method.name,
+                        javaClass,
+                        *method.parameterTypes
+                    )
+                }.invoke(null, proxy, *args.orEmpty())
             }
         }
 

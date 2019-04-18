@@ -263,8 +263,9 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             @Suppress("UNCHECKED_CAST")
             if (isMultipart) body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))
 
+            //The HttpRequestBuilder.body property can be a subtype of OutgoingContent as well as a String instance
             //jsonBody
-            if (body !is OutgoingContent && contentType() == null) {
+            if (body !is OutgoingContent && body !is String && contentType() == null) {
                 contentType(ContentType.Application.Json)
             }
         }
