@@ -24,8 +24,6 @@ private val mapType = Map::class.starProjectedType
 private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
 
 internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
-    private var isFormUrlEncoded = false
-    private var isMultipart = false
     val isSuspend = kFunction.isSuspend
     val returnTypeInfo = with(kFunction.returnType) {
         if (!isSubtypeOf(jobType)) error("Service functions must return $jobType")
@@ -35,11 +33,16 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             arguments[0].type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
         }
     }
-    private val actions =
-        Array(kFunction.valueParameters.size) { mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>() }
+    private val actions = Array(kFunction.valueParameters.size) {
+        mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>()
+    }
     private val defaultHttpRequestBuilder = HttpRequestBuilder()
+    private val preAction: HttpRequestBuilder.() -> Unit
+    private val postAction: HttpRequestBuilder.() -> Unit
 
     init {
+        var isFormUrlEncoded = false
+        var isMultipart = false
         var httpMethod: HttpMethod? = null
         var particlePath = ""
         fun parseHttpMethodAndPath(method: HttpMethod, path: String) {
@@ -244,25 +247,37 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 }
             )
         }
+
+        when {
+            isFormUrlEncoded -> {
+                preAction = { body = ParametersBuilder() }
+                postAction = { body = FormDataContent((body as ParametersBuilder).build()) }
+            }
+            isMultipart -> {
+                preAction = { body = mutableListOf<FormPart<*>>() }
+                @Suppress("UNCHECKED_CAST")
+                postAction = { body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())) }
+            }
+            else -> {
+                preAction = {}
+                postAction = {}
+            }
+        }
     }
 
     fun httpRequestBuilder(args: Array<Any?>) =
         HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
-            if (isFormUrlEncoded) body = ParametersBuilder()
-            if (isMultipart) body = mutableListOf<FormPart<*>>()
-
+            preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {
                     actions[index].forEach {
-                        this.it(arg)
+                        it(arg)
                     }
                 }
             }
+            postAction()
 
-            if (isFormUrlEncoded) body = FormDataContent((body as ParametersBuilder).build())
-            @Suppress("UNCHECKED_CAST")
-            if (isMultipart) body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))
-
+            //TODO not only jsonBody
             //The HttpRequestBuilder.body property can be a subtype of OutgoingContent as well as a String instance
             //jsonBody
             if (body !is OutgoingContent && body !is String && contentType() == null) {

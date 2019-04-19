@@ -12,6 +12,7 @@ import io.ktor.client.features.json.GsonSerializer
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.logging.LogLevel
 import io.ktor.client.features.logging.Logging
+import io.ktor.client.response.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -117,6 +118,9 @@ interface Service {
         @JvmStatic
         fun jvmStatic(arg: String) = arg
     }
+
+    @Get
+    fun raw(): Deferred<HttpResponse>
 }
 
 @TestMethodOrder(NatureOrder::class)
@@ -308,6 +312,23 @@ class Test {
     @Test
     fun jvmStatic() = Service.jvmStatic("hello").assert {
         "hello"
+    }
+
+    @Test
+    fun toStringMethod() = service.toString().assert {
+        "Service interface ${Service::class.qualifiedName}"
+    }
+
+    @Test
+    fun equalsMethod() = (service == httpClient.create<Service>()).assert {
+        true
+    }
+
+    @Test
+    fun raw() = runBlocking {
+        service.raw().await().status.assert {
+            HttpStatusCode.OK
+        }
     }
 
     @AfterAll

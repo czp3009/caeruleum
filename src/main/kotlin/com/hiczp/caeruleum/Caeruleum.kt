@@ -9,7 +9,6 @@ import java.lang.reflect.Modifier
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.kotlinFunction
 
@@ -28,6 +27,27 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                 //if isSynthetic
                 kFunction == null -> {
                     { method.invoke(proxy, *it.orEmpty()) }
+                }
+
+                //method in Object
+                method.declaringClass == Any::class.java -> when (method.name) {
+                    "equals" -> fun(args: Array<Any?>?) = when {
+                        args == null -> false
+                        args[0] === proxy -> true
+                        args[0] !is Proxy -> false
+                        else -> args[0]!!.javaClass.interfaces.let {
+                            if (it.size != 1) false else it[0] == javaClass
+                        }
+                    }
+                    "hashCode" -> {
+                        { kClass.qualifiedName.hashCode() }
+                    }
+                    "toString" -> {
+                        { "Service interface ${kClass.qualifiedName}" }
+                    }
+                    else -> {
+                        { Unit }  //Impossible
+                    }
                 }
 
                 //non-abstract method
@@ -60,43 +80,17 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                     }
                 }
 
-                //method in Object
-                method.declaringClass == Any::class.java -> when (method.name) {
-                    "equals" -> fun(args: Array<Any?>?) = when {
-                        args == null -> false
-                        args[0] === proxy -> true
-                        args[0] !is Proxy -> false
-                        else -> args[0]!!.javaClass.interfaces.let {
-                            if (it.size != 1) false else it[0] == javaClass
-                        }
-                    }
-                    "hashCode" -> {
-                        { kClass.qualifiedName.hashCode() }
-                    }
-                    "toString" -> {
-                        { "Service interface ${kClass.qualifiedName}" }
-                    }
-                    else -> {
-                        { Unit }  //Impossible
-                    }
-                }
-
                 else -> {
                     val serviceFunction = ServiceFunction(kClass, kFunction)
 
-                    fun(args: Array<Any?>?): Any {
-                        val realArgs: Array<Any?>?
-                        val coroutineContext: CoroutineContext
-                        if (serviceFunction.isSuspend) {
-                            realArgs = args!!.copyOf(args.size - 1)
-                            coroutineContext = (args.last() as Continuation<*>).context
-                        } else {
-                            realArgs = args ?: emptyArray()
-                            coroutineContext = httpClient.coroutineContext
+                    if (serviceFunction.isSuspend) {
+                        fun(args: Array<Any?>?) = CoroutineScope((args!!.last() as Continuation<*>).context).async {
+                            httpClient.execute(serviceFunction.httpRequestBuilder(args.copyOf(args.size - 1)))
+                                .receive(serviceFunction.returnTypeInfo)
                         }
-
-                        return CoroutineScope(coroutineContext).async {
-                            httpClient.execute(serviceFunction.httpRequestBuilder(realArgs))
+                    } else {
+                        fun(args: Array<Any?>?) = CoroutineScope(httpClient.coroutineContext).async {
+                            httpClient.execute(serviceFunction.httpRequestBuilder(args ?: emptyArray()))
                                 .receive(serviceFunction.returnTypeInfo)
                         }
                     }
