@@ -10,7 +10,6 @@ import io.ktor.client.request.forms.FormPart
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.*
-import io.ktor.http.content.OutgoingContent
 import io.ktor.util.appendAll
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
@@ -223,9 +222,17 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     is Body -> {
                         if (isFormUrlEncoded || isMultipart) error("@Body parameters cannot be used with form or multi-part encoding")
                         if (gotBody) error("Multiple @Body method annotations found")
+                        val contentTypeValue = annotation.value.takeIf { it.isNotEmpty() }
+                            ?: kClass.findAnnotation<DefaultContentType>()?.value
                         gotBody = true
                         actions[index].add { value ->
                             body = value
+                        }
+                        if (contentTypeValue?.isNotEmpty() == true) {
+                            val contentType = ContentType.parse(contentTypeValue)
+                            actions[index].add {
+                                contentType(contentType)
+                            }
                         }
                     }
                 }
@@ -276,12 +283,5 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 }
             }
             postAction()
-
-            //TODO not only jsonBody
-            //The HttpRequestBuilder.body property can be a subtype of OutgoingContent as well as a String instance
-            //jsonBody
-            if (body !is OutgoingContent && body !is String && contentType() == null) {
-                contentType(ContentType.Application.Json)
-            }
         }
 }

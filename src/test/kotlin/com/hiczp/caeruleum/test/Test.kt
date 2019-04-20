@@ -45,6 +45,7 @@ val httpMockEngine = MockEngine {
 
 @Suppress("DeferredIsResult")
 @BaseUrl(LOCALHOST)
+@DefaultContentType("application/json")
 interface Service {
     @Get
     fun noReturnValue(): Job

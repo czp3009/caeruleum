@@ -39,6 +39,6 @@ val githubService = httpClient.create<GitHubService>()
 
 fun main() {
     runBlocking {
-        githubService.listRepos("czp3009").await()
+        githubService.listRepos("czp3009").await().run(::println)
     }
 }

@@ -23,10 +23,12 @@ val githubService = httpClient.create<GitHubService>()
 
 fun main() {
     runBlocking {
-        githubService.listRepos("czp3009").await()
+        githubService.listRepos("czp3009").await().run(::println)
     }
 }
 ```
+
+Keep moving with Kotlin Coroutines, don't blocking!
 
 # License
 Apache License 2.0

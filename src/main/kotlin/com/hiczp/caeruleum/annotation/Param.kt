@@ -42,6 +42,9 @@ annotation class Part(val value: String = "")
 @Target(VALUE_PARAMETER)
 annotation class PartMap
 
+/**
+ * @param value ContentType
+ */
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
-annotation class Body
+annotation class Body(val value: String = "")
