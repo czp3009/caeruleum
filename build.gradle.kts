@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version Kotlin.version
+    `maven-publish`
+    signing
 }
 
 group = "com.hiczp"
@@ -17,8 +19,8 @@ repositories {
 
 //kotlin
 dependencies {
-    implementation(kotlin("stdlib-jdk8"))
-    implementation(kotlin("reflect"))
+    api(kotlin("stdlib-jdk8"))
+    api(kotlin("reflect"))
 }
 tasks.withType<KotlinCompile> {
     kotlinOptions {
@@ -33,7 +35,7 @@ tasks.withType<KotlinCompile> {
 //cio
 dependencies {
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
-    implementation("io.ktor:ktor-client-cio:${Ktor.version}")
+    api("io.ktor:ktor-client-cio:${Ktor.version}")
 }
 
 //test
@@ -50,4 +52,70 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.4.2")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
     testImplementation("io.ktor:ktor-client-mock-jvm:${Ktor.version}")
+}
+
+tasks.register<Jar>("sourcesJar") {
+    from(sourceSets.main.get().allSource)
+    archiveClassifier.set("sources")
+}
+
+tasks.register<Jar>("javadocJar") {
+    from(tasks.javadoc)
+    archiveClassifier.set("javadoc")
+}
+
+publishing {
+    repositories {
+        maven {
+            url = uri("https://oss.sonatype.org/service/local/staging/deploy/maven2/")
+            credentials {
+                username = project.properties["ossUsername"].toString()
+                password = project.properties["ossPassword"].toString()
+            }
+        }
+    }
+
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+            artifact(tasks["sourcesJar"])
+            artifact(tasks["javadocJar"])
+
+            afterEvaluate {
+                artifactId = tasks.jar.get().archiveBaseName.get()
+            }
+
+            pom {
+                name.set(project.name)
+                description.set(project.description)
+                url.set("https://github.com/czp3009/caeruleum")
+
+                licenses {
+                    license {
+                        name.set("Apache License Version 2.0")
+                        url.set("http://www.apache.org/licenses/")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("czp3009")
+                        name.set("czp3009")
+                        email.set("czp3009@gmail.com")
+                        url.set("https://www.hiczp.com")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com/czp3009/caeruleum")
+                    developerConnection.set("scm:git:ssh://github.com/czp3009/caeruleum")
+                    url.set("https://github.com/czp3009/caeruleum")
+                }
+            }
+        }
+    }
+}
+
+signing {
+    sign(publishing.publications["mavenJava"])
 }
