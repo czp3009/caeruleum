@@ -1,6 +1,12 @@
 # Caeruleum
 Retrofit inspired Http client base on CIO.
 
+# Gradle
+```groovy
+// https://mvnrepository.com/artifact/com.hiczp/caeruleum
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.0.0'
+```
+
 # Usage
 ```kotlin
 @BaseUrl("https://api.github.com/")
