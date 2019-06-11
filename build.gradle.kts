@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.hiczp"
-version = "1.0.0"
+version = Project.version
 description = "Retrofit inspired Http client base on CIO"
 
 repositories {
@@ -85,6 +85,7 @@ publishing {
                 artifactId = tasks.jar.get().archiveBaseName.get()
             }
 
+            @Suppress("UnstableApiUsage")
             pom {
                 name.set(project.name)
                 description.set(project.description)
@@ -116,6 +117,7 @@ publishing {
     }
 }
 
+@Suppress("UnstableApiUsage")
 signing {
     sign(publishing.publications["mavenJava"])
 }

@@ -7,8 +7,7 @@ import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.create
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockHttpResponse
-import io.ktor.client.features.json.GsonSerializer
+import io.ktor.client.engine.mock.respond
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.logging.LogLevel
 import io.ktor.client.features.logging.Logging
@@ -21,27 +20,10 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.io.ByteReadChannel
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.json
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Test
 
 const val LOCALHOST = "https://localhost/"
-
-val httpMockEngine = MockEngine {
-    MockHttpResponse(
-        call,
-        HttpStatusCode.OK,
-        ByteReadChannel(
-            json {
-                "header" to headers.toString()
-                "method" to method.value
-                "url" to url.toString()
-                "contentLength" to content.contentLength
-            }.toString()
-        ),
-        headersOf("Content-Type", ContentType.Application.Json.toString())
-    )
-}
 
 @Suppress("DeferredIsResult")
 @BaseUrl(LOCALHOST)
@@ -127,10 +109,24 @@ interface Service {
 @TestMethodOrder(NatureOrder::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Test {
-    private val httpClient = HttpClient(httpMockEngine) {
-        install(JsonFeature) {
-            serializer = GsonSerializer()
+    private val httpClient = HttpClient(MockEngine) {
+        engine {
+            addHandler {
+                respond(
+                    ByteReadChannel(
+                        jsonObject(
+                            "header" to it.headers.toString(),
+                            "method" to it.method.value,
+                            "url" to it.url.toString(),
+                            "contentLength" to it.body.contentLength
+                        ).toString()
+                    ),
+                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
+                )
+            }
         }
+
+        install(JsonFeature)
         install(Logging) {
             level = LogLevel.ALL
         }

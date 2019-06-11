@@ -4,7 +4,7 @@ Retrofit inspired Http client base on CIO.
 # Gradle
 ```groovy
 // https://mvnrepository.com/artifact/com.hiczp/caeruleum
-compile group: 'com.hiczp', name: 'caeruleum', version: '1.0.0'
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.1.0'
 ```
 
 # Usage
@@ -16,11 +16,8 @@ interface GitHubService {
 }
 
 val httpClient = HttpClient(CIO) {
-    install(JsonFeature) {
-        serializer = GsonSerializer()
-    }
+    install(JsonFeature)
     install(Logging) {
-        logger = Logger.DEFAULT
         level = LogLevel.ALL
     }
 }
@@ -34,7 +31,7 @@ fun main() {
 }
 ```
 
-Keep moving with Kotlin Coroutines, don't blocking!
+Keep moving, don't blocking!
 
 # License
 Apache License 2.0
