@@ -10,6 +10,8 @@ import io.ktor.client.request.forms.FormPart
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.*
+import io.ktor.util.AttributeKey
+import io.ktor.util.Attributes
 import io.ktor.util.appendAll
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
@@ -59,6 +61,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         }
 
         val headers = HeadersBuilder()
+        val attributes = Attributes(concurrent = false)
 
         kFunction.annotations.forEach {
             when (it) {
@@ -89,6 +92,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     if (isFormUrlEncoded) error("Only one encoding annotation is allowed")
                     isMultipart = true
                 }
+                is Attribute -> attributes.put(AttributeKey(it.key), it.value)
             }
         }
         if (httpMethod == null) error("HTTP method annotation is required")
@@ -261,6 +265,10 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     }
                 }
             )
+            attributes.allKeys.forEach {
+                @Suppress("UNCHECKED_CAST")
+                this.attributes.put(it as AttributeKey<Any>, attributes[it])
+            }
         }
 
         when {
