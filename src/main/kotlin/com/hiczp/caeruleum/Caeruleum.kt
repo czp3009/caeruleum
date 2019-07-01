@@ -1,14 +1,16 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import java.lang.invoke.MethodHandles
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Proxy
+import java.lang.reflect.Proxy.newProxyInstance
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.kotlinFunction
 
@@ -20,7 +22,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
     if (!javaClass.isInterface) throw IllegalArgumentException("API declarations must be interfaces")
     if (javaClass.interfaces.isNotEmpty()) throw IllegalArgumentException("API interfaces must not extend other interfaces")
 
-    return Proxy.newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
+    return newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
         cache.getOrPut(method) {
             val kFunction = method.kotlinFunction
             when {
@@ -82,14 +84,22 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
 
                 else -> {
                     val serviceFunction = ServiceFunction(kClass, kFunction)
-
                     if (serviceFunction.isSuspend) {
-                        fun(args: Array<Any?>?) = CoroutineScope((args!!.last() as Continuation<*>).context).async {
-                            httpClient.execute(serviceFunction.httpRequestBuilder(args.copyOf(args.size - 1)))
-                                .receive(serviceFunction.returnTypeInfo)
+                        fun(args: Array<Any?>?): Any {
+                            @Suppress("UNCHECKED_CAST")
+                            val continuation = args!!.last() as Continuation<Any>
+                            val realArgs = args.copyOf(args.size - 1)
+                            httpClient.launch {
+                                val result = runCatching {
+                                    httpClient.execute(serviceFunction.httpRequestBuilder(realArgs))
+                                        .receive(serviceFunction.returnTypeInfo)
+                                }
+                                continuation.resumeWith(result)
+                            }
+                            return COROUTINE_SUSPENDED
                         }
                     } else {
-                        fun(args: Array<Any?>?) = CoroutineScope(httpClient.coroutineContext).async {
+                        fun(args: Array<Any?>?) = httpClient.async {
                             httpClient.execute(serviceFunction.httpRequestBuilder(args ?: emptyArray()))
                                 .receive(serviceFunction.returnTypeInfo)
                         }

@@ -104,6 +104,15 @@ interface Service {
 
     @Get
     fun raw(): Deferred<HttpResponse>
+
+    @Get
+    suspend fun suspendGet(@Query arg1: String = "!"): JsonElement
+
+    @Post
+    suspend fun suspendPost(@Body jsonObject: JsonObject): JsonElement
+
+    @Get
+    suspend fun bothDeferredAndSuspend(): Deferred<JsonElement>
 }
 
 @TestMethodOrder(NatureOrder::class)
@@ -221,7 +230,7 @@ class Test {
     @Test
     fun postWithoutBody() = runBlocking {
         service.postWithoutBody().await().contentLength.assert {
-            null
+            0
         }
     }
 
@@ -325,6 +334,30 @@ class Test {
     fun raw() = runBlocking {
         service.raw().await().status.assert {
             HttpStatusCode.OK
+        }
+    }
+
+    @Test
+    fun suspendGet() = runBlocking {
+        service.suspendGet().url.assert {
+            "$LOCALHOST?arg1=%21"
+        }
+    }
+
+    @Test
+    fun suspendPost() = runBlocking {
+        val jsonObject = jsonObject(
+            "a" to 1
+        )
+        service.suspendPost(jsonObject).contentLength.assert { jsonObject.toString().length }
+    }
+
+    @Test
+    fun bothDeferredAndSuspend() {
+        assertThrows<IllegalStateException> {
+            runBlocking {
+                service.bothDeferredAndSuspend().await()
+            }
         }
     }
 

@@ -22,14 +22,22 @@ private val jobType = Job::class.createType()
 private val mapType = Map::class.starProjectedType
 private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
 
+@Suppress("MemberVisibilityCanBePrivate")
 internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     val isSuspend = kFunction.isSuspend
+    val isJob = kFunction.returnType.isSubtypeOf(jobType)
+
+    init {
+        if (!isSuspend && !isJob || isSuspend && isJob) {
+            error("Service functions must be suspend or return $jobType")
+        }
+    }
+
     val returnTypeInfo = with(kFunction.returnType) {
-        if (!isSubtypeOf(jobType)) error("Service functions must return $jobType")
-        if (arguments.isEmpty()) {
-            anyTypeInfo
+        if (isJob) {
+            arguments.firstOrNull()?.type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
         } else {
-            arguments[0].type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
+            TypeInfo(this.jvmErasure, this.javaType)
         }
     }
     private val actions = Array(kFunction.valueParameters.size) {
