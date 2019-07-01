@@ -4,7 +4,7 @@ Retrofit inspired Http client base on CIO.
 # Gradle
 ```groovy
 // https://mvnrepository.com/artifact/com.hiczp/caeruleum
-compile group: 'com.hiczp', name: 'caeruleum', version: '1.1.0'
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.1.1'
 ```
 
 # Usage
@@ -12,21 +12,26 @@ compile group: 'com.hiczp', name: 'caeruleum', version: '1.1.0'
 @BaseUrl("https://api.github.com/")
 interface GitHubService {
     @Get("users/{user}/repos")
-    fun listRepos(@Path user: String): Deferred<JsonElement>
+    fun listReposAsync(@Path user: String): Deferred<JsonElement>
+
+    @Get("users/{user}/repos")
+    suspend fun listRepos(@Path user: String): JsonElement
 }
 
 val httpClient = HttpClient(CIO) {
-    install(JsonFeature)
+    install(JsonFeature) {
+        serializer = GsonSerializer()
+    }
     install(Logging) {
         level = LogLevel.ALL
     }
 }
 
-val githubService = httpClient.create<GitHubService>()
-
 fun main() {
+    val githubService = httpClient.create<GitHubService>()
     runBlocking {
-        githubService.listRepos("czp3009").await().run(::println)
+        githubService.listReposAsync("czp3009").await().run(::println)
+        githubService.listRepos("czp3009").run(::println)
     }
 }
 ```
