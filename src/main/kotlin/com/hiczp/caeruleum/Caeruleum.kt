@@ -1,7 +1,9 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.lang.invoke.MethodHandles
 import java.lang.reflect.Method
@@ -11,10 +13,11 @@ import java.lang.reflect.Proxy.newProxyInstance
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.resumeWithException
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.kotlinFunction
 
-private val cache = ConcurrentHashMap<Method, (Array<Any?>?) -> Any>()
+private val cache = ConcurrentHashMap<Method, (HttpClient, Array<Any?>?) -> Any>()
 
 @PublishedApi
 internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
@@ -23,33 +26,29 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
     if (javaClass.interfaces.isNotEmpty()) throw IllegalArgumentException("API interfaces must not extend other interfaces")
 
     return newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
+        if (!httpClient.isActive) throw CancellationException("Parent context in HttpClient is cancelled")
+
         cache.getOrPut(method) {
             val kFunction = method.kotlinFunction
             when {
                 //if isSynthetic
-                kFunction == null -> {
-                    { method.invoke(proxy, *it.orEmpty()) }
-                }
+                kFunction == null -> { _, args -> method.invoke(proxy, *args.orEmpty()) }
 
                 //method in Object
                 method.declaringClass == Any::class.java -> when (method.name) {
-                    "equals" -> fun(args: Array<Any?>?) = when {
-                        args == null -> false
-                        args[0] === proxy -> true
-                        args[0] !is Proxy -> false
-                        else -> args[0]!!.javaClass.interfaces.let {
-                            if (it.size != 1) false else it[0] == javaClass
+                    "equals" -> { _, args ->
+                        when {
+                            args == null -> false
+                            args[0] === proxy -> true
+                            args[0] !is Proxy -> false
+                            else -> args[0]!!.javaClass.interfaces.let {
+                                if (it.size != 1) false else it[0] == javaClass
+                            }
                         }
                     }
-                    "hashCode" -> {
-                        { kClass.qualifiedName.hashCode() }
-                    }
-                    "toString" -> {
-                        { "Service interface ${kClass.qualifiedName}" }
-                    }
-                    else -> {
-                        { Unit }  //Impossible
-                    }
+                    "hashCode" -> { _, _ -> kClass.qualifiedName.hashCode() }
+                    "toString" -> { _, _ -> "Service interface ${kClass.qualifiedName}" }
+                    else -> { _, _ -> Unit }  //Impossible
                 }
 
                 //non-abstract method
@@ -65,7 +64,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             setAccessible(true)
                         }
 
-                        fun(args: Array<Any?>?) = methodHandles.newInstance(javaClass, -1)
+                        fun(_, args) = methodHandles.newInstance(javaClass, -1)
                             .unreflectSpecial(method, javaClass)
                             .bindTo(proxy)
                             .invokeWithArguments(*args.orEmpty())
@@ -78,14 +77,14 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             *method.parameterTypes
                         )
 
-                        fun(args: Array<Any?>?) = realMethod.invoke(null, proxy, *args.orEmpty())
+                        fun(_, args) = realMethod.invoke(null, proxy, *args.orEmpty())
                     }
                 }
 
                 else -> {
                     val serviceFunction = ServiceFunction(kClass, kFunction)
                     if (serviceFunction.isSuspend) {
-                        fun(args: Array<Any?>?): Any {
+                        { httpClient, args ->
                             @Suppress("UNCHECKED_CAST")
                             val continuation = args!!.last() as Continuation<Any>
                             val realArgs = args.copyOf(args.size - 1)
@@ -95,18 +94,20 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                                         .receive(serviceFunction.returnTypeInfo)
                                 }
                                 continuation.resumeWith(result)
-                            }
-                            return COROUTINE_SUSPENDED
+                            }.invokeOnCompletion { if (it != null) continuation.resumeWithException(it) }
+                            COROUTINE_SUSPENDED
                         }
                     } else {
-                        fun(args: Array<Any?>?) = httpClient.async {
-                            httpClient.execute(serviceFunction.httpRequestBuilder(args ?: emptyArray()))
-                                .receive(serviceFunction.returnTypeInfo)
+                        { httpClient, args ->
+                            httpClient.async {
+                                httpClient.execute(serviceFunction.httpRequestBuilder(args ?: emptyArray()))
+                                    .receive(serviceFunction.returnTypeInfo)
+                            }
                         }
                     }
                 }
             }
-        }(args)
+        }(httpClient, args)
     }
 }
 

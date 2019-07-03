@@ -16,6 +16,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.io.ByteReadChannel
@@ -115,31 +116,33 @@ interface Service {
     suspend fun bothDeferredAndSuspend(): Deferred<JsonElement>
 }
 
+fun createHttpClient() = HttpClient(MockEngine) {
+    engine {
+        addHandler {
+            respond(
+                ByteReadChannel(
+                    jsonObject(
+                        "header" to it.headers.toString(),
+                        "method" to it.method.value,
+                        "url" to it.url.toString(),
+                        "contentLength" to it.body.contentLength
+                    ).toString()
+                ),
+                headers = headersOf("Content-Type", ContentType.Application.Json.toString())
+            )
+        }
+    }
+
+    install(JsonFeature)
+    install(Logging) {
+        level = LogLevel.ALL
+    }
+}
+
 @TestMethodOrder(NatureOrder::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Test {
-    private val httpClient = HttpClient(MockEngine) {
-        engine {
-            addHandler {
-                respond(
-                    ByteReadChannel(
-                        jsonObject(
-                            "header" to it.headers.toString(),
-                            "method" to it.method.value,
-                            "url" to it.url.toString(),
-                            "contentLength" to it.body.contentLength
-                        ).toString()
-                    ),
-                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
-                )
-            }
-        }
-
-        install(JsonFeature)
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-    }
+    private val httpClient = createHttpClient()
     private lateinit var service: Service
 
     @BeforeAll
@@ -357,6 +360,35 @@ class Test {
         assertThrows<IllegalStateException> {
             runBlocking {
                 service.bothDeferredAndSuspend().await()
+            }
+        }
+    }
+
+    @Test
+    fun closeHttpClient() {
+        val oldHttpClient = createHttpClient()
+        val oldService = oldHttpClient.create<Service>()
+        runBlocking {
+            oldService.suspendGet().let(::println)
+        }
+        oldHttpClient.close()
+
+        val newHttpClient = createHttpClient()
+        val newService = newHttpClient.create<Service>()
+        runBlocking {
+            newService.suspendGet().let(::println)
+        }
+        newHttpClient.close()
+    }
+
+    @Test
+    fun callClosedHttpClient() {
+        val httpClient = createHttpClient()
+        val service = httpClient.create<Service>()
+        httpClient.close()
+        assertThrows<CancellationException> {
+            runBlocking {
+                service.suspendGet().let(::println)
             }
         }
     }
