@@ -41,7 +41,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                         when {
                             args == null -> false
                             args[0] === proxy -> true
-                            args[0] !is Proxy -> false
+                            args[0] !is java.lang.reflect.Proxy -> false
                             else -> args[0]!!.javaClass.interfaces.let {
                                 if (it.size != 1) false else it[0] == javaClass
                             }
