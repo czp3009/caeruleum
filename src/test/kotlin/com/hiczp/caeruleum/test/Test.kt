@@ -116,6 +116,17 @@ interface Service {
     suspend fun bothDeferredAndSuspend(): Deferred<JsonElement>
 }
 
+interface NoBaseUrl {
+    @Get
+    suspend fun get(): JsonElement
+
+    @Get
+    suspend fun getWithParam(@Query param1: String = "!"): JsonElement
+
+    @Get
+    suspend fun dynamic(@Url url: String = LOCALHOST): JsonElement
+}
+
 fun createHttpClient() = HttpClient(MockEngine) {
     engine {
         addHandler {
@@ -389,6 +400,46 @@ class Test {
         assertThrows<CancellationException> {
             runBlocking {
                 service.suspendGet().let(::println)
+            }
+        }
+    }
+
+    @Test
+    fun noBaseUrl() {
+        val noBaseUrl = httpClient.create<NoBaseUrl>()
+        runBlocking {
+            noBaseUrl.get().url.assert {
+                "http://localhost/"
+            }
+        }
+    }
+
+    @Test
+    fun noBaseUrlWithParam() {
+        val noBaseUrl = httpClient.create<NoBaseUrl>()
+        runBlocking {
+            noBaseUrl.getWithParam().url.assert {
+                "http://localhost/?param1=%21"
+            }
+        }
+    }
+
+    @Test
+    fun dynamicBaseUrl() {
+        val dynamicBaseUrl = httpClient.create<NoBaseUrl>(LOCALHOST)
+        runBlocking {
+            dynamicBaseUrl.get().url.assert {
+                LOCALHOST
+            }
+        }
+    }
+
+    @Test
+    fun dynamicUrl() {
+        val dynamicUrl = httpClient.create<NoBaseUrl>()
+        runBlocking {
+            dynamicUrl.dynamic().url.assert {
+                LOCALHOST
             }
         }
     }

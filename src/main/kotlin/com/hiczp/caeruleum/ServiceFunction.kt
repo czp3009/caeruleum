@@ -48,6 +48,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     private val defaultHttpRequestBuilder = HttpRequestBuilder()
     private val preAction: HttpRequestBuilder.() -> Unit
     private val postAction: HttpRequestBuilder.() -> Unit
+    private val particlePathAction: URLBuilder.() -> Unit
 
     init {
         var isFormUrlEncoded = false
@@ -251,20 +252,19 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             }
         }
 
+        particlePathAction = if (particlePath.isNotEmpty()) {
+            if (particlePath.startsWith('/')) {
+                fun URLBuilder.() { encodedPath = particlePath }
+            } else {
+                fun URLBuilder.() { encodedPath += particlePath }
+            }
+        } else {
+            {}
+        }
+
         defaultHttpRequestBuilder.apply {
             this.headers.appendAll(headers)
             method = httpMethod!!
-            url.takeFrom(
-                URLBuilder(kClass.findAnnotation<BaseUrl>()?.value ?: "").apply {
-                    if (particlePath.isNotEmpty()) {
-                        if (particlePath.startsWith('/')) {
-                            encodedPath = particlePath
-                        } else {
-                            encodedPath += particlePath
-                        }
-                    }
-                }
-            )
             attributes.allKeys.forEach {
                 @Suppress("UNCHECKED_CAST")
                 this.attributes.put(it as AttributeKey<Any>, attributes[it])
@@ -288,8 +288,13 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         }
     }
 
-    fun httpRequestBuilder(args: Array<Any?>) =
+    private val baseUrlAnnotationValue = kClass.findAnnotation<BaseUrl>()?.value
+
+    fun httpRequestBuilder(baseUrl: String?, args: Array<Any?>) =
         HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
+            (baseUrlAnnotationValue ?: baseUrl)?.let {
+                url.takeFrom(URLBuilder(it).apply { particlePathAction() })
+            }
             preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {

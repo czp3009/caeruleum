@@ -1,9 +1,9 @@
 object Project {
-    const val version = "1.2.2"
+    const val version = "1.2.3"
 }
 
 object Kotlin {
-    const val version = "1.3.40"
+    const val version = "1.3.41"
 }
 
 object Ktor {

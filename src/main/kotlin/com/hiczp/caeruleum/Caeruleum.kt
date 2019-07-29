@@ -18,10 +18,10 @@ import kotlin.reflect.jvm.kotlinFunction
 
 private typealias Proxy = Any
 
-private val cache = ConcurrentHashMap<Method, (Proxy, HttpClient, Array<Any?>?) -> Any>()
+private val cache = ConcurrentHashMap<Method, (Proxy, HttpClient, String?, Array<Any?>?) -> Any>()
 
 @PublishedApi
-internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient): Any {
+internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient, baseUrl: String?): Any {
     val javaClass = kClass.java
     if (!javaClass.isInterface) throw IllegalArgumentException("API declarations must be interfaces")
     if (javaClass.interfaces.isNotEmpty()) throw IllegalArgumentException("API interfaces must not extend other interfaces")
@@ -33,11 +33,11 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
             val kFunction = method.kotlinFunction
             when {
                 //if isSynthetic
-                kFunction == null -> { proxy, _, args -> method.invoke(proxy, *args.orEmpty()) }
+                kFunction == null -> { proxy, _, _, args -> method.invoke(proxy, *args.orEmpty()) }
 
                 //method in Object
                 method.declaringClass == Any::class.java -> when (method.name) {
-                    "equals" -> { proxy, _, args ->
+                    "equals" -> { proxy, _, _, args ->
                         when {
                             args == null -> false
                             args[0] === proxy -> true
@@ -47,9 +47,9 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             }
                         }
                     }
-                    "hashCode" -> { _, _, _ -> kClass.qualifiedName.hashCode() }
-                    "toString" -> { _, _, _ -> "Service interface ${kClass.qualifiedName}" }
-                    else -> { _, _, _ -> Unit }  //Impossible
+                    "hashCode" -> { _, _, _, _ -> kClass.qualifiedName.hashCode() }
+                    "toString" -> { _, _, _, _ -> "Service interface ${kClass.qualifiedName}" }
+                    else -> { _, _, _, _ -> Unit }  //Impossible
                 }
 
                 //non-abstract method
@@ -65,7 +65,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             setAccessible(true)
                         }
 
-                        fun(proxy, _, args) = methodHandles.newInstance(javaClass, -1)
+                        fun(proxy, _, _, args) = methodHandles.newInstance(javaClass, -1)
                             .unreflectSpecial(method, javaClass)
                             .bindTo(proxy)
                             .invokeWithArguments(*args.orEmpty())
@@ -78,20 +78,20 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             *method.parameterTypes
                         )
 
-                        fun(proxy, _, args) = realMethod.invoke(null, proxy, *args.orEmpty())
+                        fun(proxy, _, _, args) = realMethod.invoke(null, proxy, *args.orEmpty())
                     }
                 }
 
                 else -> {
                     val serviceFunction = ServiceFunction(kClass, kFunction)
                     if (serviceFunction.isSuspend) {
-                        { _, httpClient, args ->
+                        { _, httpClient, baseUrl, args ->
                             @Suppress("UNCHECKED_CAST")
                             val continuation = args!!.last() as Continuation<Any>
                             val realArgs = args.copyOf(args.size - 1)
                             httpClient.launch {
                                 val result = runCatching {
-                                    httpClient.execute(serviceFunction.httpRequestBuilder(realArgs))
+                                    httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, realArgs))
                                         .receive(serviceFunction.returnTypeInfo)
                                 }
                                 continuation.resumeWith(result)
@@ -99,17 +99,18 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient)
                             COROUTINE_SUSPENDED
                         }
                     } else {
-                        { _, httpClient, args ->
+                        { _, httpClient, baseUrl, args ->
                             httpClient.async {
-                                httpClient.execute(serviceFunction.httpRequestBuilder(args ?: emptyArray()))
+                                httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, args ?: emptyArray()))
                                     .receive(serviceFunction.returnTypeInfo)
                             }
                         }
                     }
                 }
             }
-        }(proxy, httpClient, args)
+        }(proxy, httpClient, baseUrl, args)
     }
 }
 
-inline fun <reified T> HttpClient.create() = dynamicProxyToHttpClient(T::class, this) as T
+inline fun <reified T> HttpClient.create(baseUrl: String? = null) =
+    dynamicProxyToHttpClient(T::class, this, baseUrl) as T

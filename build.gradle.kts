@@ -49,7 +49,7 @@ dependencies {
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
     testImplementation("org.slf4j:slf4j-simple:1.7.26")
     // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
-    testImplementation("org.junit.jupiter:junit-jupiter:5.4.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.5.1")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
     testImplementation("io.ktor:ktor-client-mock-jvm:${Ktor.version}")
 }
