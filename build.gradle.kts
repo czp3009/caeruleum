@@ -47,7 +47,7 @@ dependencies {
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging-jvm
     testImplementation("io.ktor:ktor-client-logging-jvm:${Ktor.version}")
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
-    testImplementation("org.slf4j:slf4j-simple:1.7.26")
+    testImplementation("org.slf4j:slf4j-simple:1.7.28")
     // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
     testImplementation("org.junit.jupiter:junit-jupiter:5.5.1")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
