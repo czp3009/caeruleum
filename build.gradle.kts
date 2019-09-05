@@ -10,7 +10,7 @@ plugins {
 
 group = "com.hiczp"
 version = Project.version
-description = "Retrofit inspired Http client base on CIO"
+description = "Retrofit inspired Http client base on ktor-client"
 
 repositories {
     mavenCentral()
@@ -32,14 +32,16 @@ tasks.withType<KotlinCompile> {
     }
 }
 
-//cio
+//ktor-client
 dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
-    api("io.ktor:ktor-client-cio:${Ktor.version}")
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core-jvm
+    api("io.ktor:ktor-client-core-jvm:${Ktor.version}")
 }
 
 //test
 dependencies {
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
+    testImplementation("io.ktor:ktor-client-cio:${Ktor.version}")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
     testImplementation("io.ktor:ktor-client-gson:${Ktor.version}")
     // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson

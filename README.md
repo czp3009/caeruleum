@@ -1,10 +1,10 @@
 # Caeruleum
-Retrofit inspired Http client base on CIO.
+Retrofit inspired Http client base on ktor-client.
 
 # Gradle
 ```groovy
 // https://mvnrepository.com/artifact/com.hiczp/caeruleum
-compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.4'
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.5'
 ```
 
 # Usage
@@ -35,6 +35,10 @@ fun main() {
     }
 }
 ```
+
+Engine is optional, example above use CIO engine.
+
+see all available engine here https://ktor.io/clients/http-client/engines.html
 
 Keep moving, don't blocking!
 
