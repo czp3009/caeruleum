@@ -107,6 +107,28 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
 
             kParameter.annotations.forEach { annotation ->
+                fun parseQuery(annotationValue: String) {
+                    val name = annotationValue.orParameterName()
+                    gotQuery = true
+                    actions[index].add { value ->
+                        url.parameters.append(
+                            name,
+                            value.toString()
+                        )
+                    }
+                }
+
+                fun parseField(annotationValue: String) {
+                    if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
+                    val name = annotationValue.orParameterName()
+                    actions[index].add { value ->
+                        (body as ParametersBuilder).append(
+                            name,
+                            value.toString()
+                        )
+                    }
+                }
+
                 when (annotation) {
                     is Url -> {
                         if (gotUrl) error("Multiple @Url method annotations found")
@@ -153,16 +175,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                     }
 
-                    is Query -> {
-                        val name = annotation.value.orParameterName()
-                        gotQuery = true
-                        actions[index].add { value ->
-                            url.parameters.append(
-                                name,
-                                value.toString()
-                            )
-                        }
-                    }
+                    is Query -> parseQuery(annotation.value)
 
                     is QueryMap -> {
                         if (!kParameter.type.isSubtypeOf(mapType)) {
@@ -181,16 +194,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                     }
 
-                    is Field -> {
-                        if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
-                        val name = annotation.value.orParameterName()
-                        actions[index].add { value ->
-                            (body as ParametersBuilder).append(
-                                name,
-                                value.toString()
-                            )
-                        }
-                    }
+                    is Field -> parseField(annotation.value)
 
                     is FieldMap -> {
                         if (!isFormUrlEncoded) error("@FieldMap parameters can only be used with form encoding")
@@ -248,6 +252,10 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                             }
                         }
                     }
+
+                    is Queries -> annotation.value.forEach { parseQuery(it.value) }
+
+                    is Fields -> annotation.value.forEach { parseField(it.value) }
                 }
             }
         }

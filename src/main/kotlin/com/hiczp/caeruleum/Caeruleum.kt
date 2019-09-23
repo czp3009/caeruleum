@@ -10,8 +10,6 @@ import java.lang.reflect.Modifier
 import java.lang.reflect.Proxy.newProxyInstance
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.reflect.KClass
 import kotlin.reflect.jvm.kotlinFunction
 
@@ -77,10 +75,11 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     val continuation = args!!.last() as Continuation<Any>
                     val realArgs = args.copyOf(args.size - 1)
                     httpClient.launch {
-                        httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, realArgs))
-                            .receive(serviceFunction.returnTypeInfo)
-                            .run(continuation::resume)
-                    }.invokeOnCompletion { if (it != null) continuation.resumeWithException(it) }
+                        runCatching {
+                            httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, realArgs))
+                                .receive(serviceFunction.returnTypeInfo)
+                        }.run(continuation::resumeWith)
+                    }
                     COROUTINE_SUSPENDED
                 } else {
                     httpClient.async {

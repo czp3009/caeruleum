@@ -1,3 +1,5 @@
+import org.gradle.api.JavaVersion
+
 object Project {
     const val version = "1.2.6"
 }
@@ -11,5 +13,5 @@ object Ktor {
 }
 
 object Java {
-    const val version = "1.8"
+    val version = JavaVersion.VERSION_1_8.toString()
 }

@@ -18,9 +18,18 @@ annotation class Header(val value: String)
 @Target(VALUE_PARAMETER)
 annotation class HeaderMap
 
+//Repeatable is not support, see below
+//https://youtrack.jetbrains.com/issue/KT-12794?_ga=2.40144167.443754125.1569230332-295160856.1538112684
+//Use container instead
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
+@Repeatable
 annotation class Query(val value: String = "")
+
+//Container of Query
+@MustBeDocumented
+@Target(VALUE_PARAMETER)
+annotation class Queries(vararg val value: Query)
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
@@ -28,7 +37,13 @@ annotation class QueryMap
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
+@Repeatable
 annotation class Field(val value: String = "")
+
+//Container of Field
+@MustBeDocumented
+@Target(VALUE_PARAMETER)
+annotation class Fields(vararg val value: Field)
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)

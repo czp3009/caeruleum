@@ -119,6 +119,18 @@ interface Service {
 
     @Get("/notFound")
     suspend fun notFound()
+
+    @Post
+    @FormUrlEncoded
+    suspend fun multiAnnotation(@Query("arg1") @Field("arg2") arg: String = "!")
+
+    @Post
+    @FormUrlEncoded
+    suspend fun containerAnnotation(
+        @Queries(Query("arg1"), Query("arg2"))
+        @Fields(Field("field1"), Field("field2"))
+        arg: String = "!"
+    )
 }
 
 interface NoBaseUrl {
@@ -458,6 +470,20 @@ class Test {
             runBlocking {
                 service.notFound()
             }
+        }
+    }
+
+    @Test
+    fun multiAnnotation() {
+        runBlocking {
+            service.multiAnnotation()
+        }
+    }
+
+    @Test
+    fun containerAnnotation() {
+        runBlocking {
+            service.containerAnnotation()
         }
     }
 
