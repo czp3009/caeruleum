@@ -10,6 +10,7 @@ import io.ktor.client.request.forms.FormPart
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.*
+import io.ktor.http.content.OutgoingContent
 import io.ktor.util.AttributeKey
 import io.ktor.util.Attributes
 import io.ktor.util.appendAll
@@ -239,16 +240,19 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     is Body -> {
                         if (isFormUrlEncoded || isMultipart) error("@Body parameters cannot be used with form or multi-part encoding")
                         if (gotBody) error("Multiple @Body method annotations found")
-                        val contentTypeValue = annotation.value.takeIf { it.isNotEmpty() }
-                            ?: kClass.findAnnotation<DefaultContentType>()?.value
                         gotBody = true
                         actions[index].add { value ->
                             body = value
                         }
-                        if (contentTypeValue?.isNotEmpty() == true) {
-                            val contentType = ContentType.parse(contentTypeValue)
-                            actions[index].add {
-                                contentType(contentType)
+                        //Content-Type priority: OutGoingContent.contentType > @Body > @DefaultContentType
+                        val contentTypeInAnnotation = (annotation.value.takeIf { it.isNotEmpty() }
+                            ?: kClass.findAnnotation<DefaultContentType>()?.value?.takeIf { it.isNotEmpty() })
+                            ?.let { ContentType.parse(it) }
+                        if (contentTypeInAnnotation != null) {
+                            actions[index].add { value ->
+                                if (value !is OutgoingContent || value.contentType == null) {
+                                    contentType(contentTypeInAnnotation)
+                                }
                             }
                         }
                     }

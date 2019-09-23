@@ -14,6 +14,7 @@ import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.logging.LogLevel
 import io.ktor.client.features.logging.Logging
 import io.ktor.client.response.HttpResponse
+import io.ktor.content.TextContent
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -131,6 +132,11 @@ interface Service {
         @Fields(Field("field1"), Field("field2"))
         arg: String = "!"
     )
+
+    @Post
+    suspend fun postWithTextBody(
+        @Body body: TextContent = TextContent("!", ContentType.Text.Plain)
+    ): JsonElement
 }
 
 interface NoBaseUrl {
@@ -484,6 +490,13 @@ class Test {
     fun containerAnnotation() {
         runBlocking {
             service.containerAnnotation()
+        }
+    }
+
+    @Test
+    fun postWithTextBody() {
+        runBlocking {
+            service.postWithTextBody()
         }
     }
 
