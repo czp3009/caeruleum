@@ -8,6 +8,8 @@ import com.hiczp.caeruleum.create
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.features.ClientRequestException
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.logging.LogLevel
 import io.ktor.client.features.logging.Logging
@@ -114,6 +116,9 @@ interface Service {
 
     @Get
     suspend fun bothDeferredAndSuspend(): Deferred<JsonElement>
+
+    @Get("/notFound")
+    suspend fun notFound()
 }
 
 interface NoBaseUrl {
@@ -130,17 +135,20 @@ interface NoBaseUrl {
 fun createHttpClient() = HttpClient(MockEngine) {
     engine {
         addHandler {
-            respond(
-                ByteReadChannel(
-                    jsonObject(
-                        "header" to it.headers.toString(),
-                        "method" to it.method.value,
-                        "url" to it.url.toString(),
-                        "contentLength" to it.body.contentLength
-                    ).toString()
-                ),
-                headers = headersOf("Content-Type", ContentType.Application.Json.toString())
-            )
+            when (it.url.encodedPath) {
+                "/notFound" -> respondError(HttpStatusCode.NotFound)
+                else -> respond(
+                    ByteReadChannel(
+                        jsonObject(
+                            "header" to it.headers.toString(),
+                            "method" to it.method.value,
+                            "url" to it.url.toString(),
+                            "contentLength" to it.body.contentLength
+                        ).toString()
+                    ),
+                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
+                )
+            }
         }
     }
 
@@ -440,6 +448,15 @@ class Test {
         runBlocking {
             dynamicUrl.dynamic().url.assert {
                 LOCALHOST
+            }
+        }
+    }
+
+    @Test
+    fun notFound() {
+        assertThrows<ClientRequestException> {
+            runBlocking {
+                service.notFound()
             }
         }
     }

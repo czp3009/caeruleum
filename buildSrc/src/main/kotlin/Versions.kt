@@ -1,5 +1,5 @@
 object Project {
-    const val version = "1.2.5"
+    const val version = "1.2.6"
 }
 
 object Kotlin {

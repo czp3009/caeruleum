@@ -217,7 +217,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     }
 
                     is PartMap -> {
-                        if (!isMultipart) throw  IllegalArgumentException("@PartMap parameters can only be used with multipart encoding")
+                        require(isMultipart) { "@PartMap parameters can only be used with multipart encoding" }
                         if (!kParameter.type.isSubtypeOf(mapType)) {
                             error("@FieldMap parameter type must be Map")
                         }
@@ -290,7 +290,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
 
     private val baseUrlAnnotationValue = kClass.findAnnotation<BaseUrl>()?.value
 
-    fun httpRequestBuilder(baseUrl: String?, args: Array<Any?>) =
+    fun httpRequestBuilder(baseUrl: String?, args: Array<out Any?>) =
         HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
             (baseUrlAnnotationValue ?: baseUrl)?.let {
                 url.takeFrom(URLBuilder(it).apply { particlePathAction() })

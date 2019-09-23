@@ -4,11 +4,12 @@ Retrofit inspired Http client base on ktor-client.
 # Gradle
 ```groovy
 // https://mvnrepository.com/artifact/com.hiczp/caeruleum
-compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.5'
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.6'
 ```
 
 # Usage
 ```kotlin
+//Define HTTP API in interface with annotation
 @BaseUrl("https://api.github.com/")
 interface GitHubService {
     @Get("users/{user}/repos")
@@ -18,6 +19,7 @@ interface GitHubService {
     suspend fun listRepos(@Path user: String): JsonElement
 }
 
+//create closeable HttpClient
 val httpClient = HttpClient(CIO) {
     install(JsonFeature) {
         serializer = GsonSerializer()
@@ -27,6 +29,7 @@ val httpClient = HttpClient(CIO) {
     }
 }
 
+//get implement of interface
 fun main() {
     val githubService = httpClient.create<GitHubService>()
     runBlocking {
