@@ -137,6 +137,9 @@ interface Service {
     suspend fun postWithTextBody(
         @Body body: TextContent = TextContent("!", ContentType.Text.Plain)
     ): JsonElement
+
+    @Get
+    suspend fun getWithEnum(@Query testEnum: TestEnum = TestEnum.MY_NAME_VERY_LONG): JsonElement
 }
 
 interface NoBaseUrl {
@@ -148,6 +151,11 @@ interface NoBaseUrl {
 
     @Get
     suspend fun dynamic(@Url url: String = LOCALHOST): JsonElement
+}
+
+enum class TestEnum {
+    @EncodeName("sort")
+    MY_NAME_VERY_LONG
 }
 
 fun createHttpClient() = HttpClient(MockEngine) {
@@ -497,6 +505,15 @@ class Test {
     fun postWithTextBody() {
         runBlocking {
             service.postWithTextBody()
+        }
+    }
+
+    @Test
+    fun getWithEnum() {
+        runBlocking {
+            service.getWithEnum().url.assert {
+                "https://localhost/?testEnum=sort"
+            }
         }
     }
 

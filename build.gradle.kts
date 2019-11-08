@@ -56,6 +56,10 @@ dependencies {
     testImplementation("io.ktor:ktor-client-mock-jvm:${Ktor.version}")
 }
 
+tasks.test {
+    useJUnitPlatform()
+}
+
 tasks.register<Jar>("sourcesJar") {
     from(sourceSets.main.get().allSource)
     archiveClassifier.set("sources")

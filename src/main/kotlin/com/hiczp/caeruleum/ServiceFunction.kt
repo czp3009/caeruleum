@@ -310,8 +310,14 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {
+                    //enum
+                    val value = if (arg is Enum<*>) {
+                        arg::class.java.getField(arg.name).getAnnotation(EncodeName::class.java)?.value ?: arg.name
+                    } else {
+                        arg
+                    }
                     actions[index].forEach {
-                        it(arg)
+                        it(value)
                     }
                 }
             }
