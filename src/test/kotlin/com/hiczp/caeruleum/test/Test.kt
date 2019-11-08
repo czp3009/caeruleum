@@ -140,6 +140,29 @@ interface Service {
 
     @Get
     suspend fun getWithEnum(@Query testEnum: TestEnum = TestEnum.MY_NAME_VERY_LONG): JsonElement
+
+    @Headers(["Key: "])
+    @Get
+    suspend fun headersWithoutValue(): JsonElement
+
+    @Get
+    suspend fun queryParamWithArray(@Query args: IntArray = intArrayOf(1, 2, 3)): JsonElement
+
+    @Get
+    suspend fun queryParamWithObjectArray(@Query args: Array<String> = arrayOf("1", "2", "3")): JsonElement
+
+    @Get
+    suspend fun queryParamWithList(@Query args: List<Int> = listOf(1, 2, 3)): JsonElement
+
+    @Get
+    suspend fun queryParamWithVarargs(@Query vararg args: Int = intArrayOf(1, 2, 3)): JsonElement
+
+    @Get
+    suspend fun queryParamWithEmpty(@Query args: String = ""): JsonElement
+
+    @Post
+    @FormUrlEncoded
+    suspend fun fieldWithArray(@Field args: IntArray = intArrayOf(1, 2, 3)): JsonElement
 }
 
 interface NoBaseUrl {
@@ -514,6 +537,25 @@ class Test {
             service.getWithEnum().url.assert {
                 "https://localhost/?testEnum=sort"
             }
+        }
+    }
+
+    @Test
+    fun headersWithoutValue() {
+        runBlocking {
+            service.headersWithoutValue()
+        }
+    }
+
+    @Test
+    fun iterableArgs() {
+        runBlocking {
+            service.queryParamWithArray()
+            service.queryParamWithObjectArray()
+            service.queryParamWithList()
+            service.queryParamWithVarargs()
+            service.queryParamWithEmpty()
+            service.fieldWithArray()
         }
     }
 

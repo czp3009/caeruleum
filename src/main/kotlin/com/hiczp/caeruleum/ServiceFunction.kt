@@ -11,15 +11,14 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.http.*
 import io.ktor.http.content.OutgoingContent
-import io.ktor.util.AttributeKey
-import io.ktor.util.Attributes
-import io.ktor.util.appendAll
+import io.ktor.util.*
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.*
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.jvmErasure
+import java.lang.reflect.Array as ArrayUtils
 
 private val jobType = Job::class.createType()
 private val mapType = Map::class.starProjectedType
@@ -112,10 +111,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     val name = annotationValue.orParameterName()
                     gotQuery = true
                     actions[index].add { value ->
-                        url.parameters.append(
-                            name,
-                            value.toString()
-                        )
+                        url.parameters.appendIterableValue(name, value)
                     }
                 }
 
@@ -123,10 +119,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                     if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
                     val name = annotationValue.orParameterName()
                     actions[index].add { value ->
-                        (body as ParametersBuilder).append(
-                            name,
-                            value.toString()
-                        )
+                        (body as ParametersBuilder).appendIterableValue(name, value)
                     }
                 }
 
@@ -168,11 +161,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                             error("@HeaderMap parameter type must be Map")
                         }
                         actions[index].add { value ->
-                            (value as Map<*, *>).forEach { (headerName, headerValue) ->
-                                if (headerName != null && headerValue != null) {
-                                    headers.append(headerName.toString(), headerValue.toString())
-                                }
-                            }
+                            headers.appendMap(value as Map<*, *>)
                         }
                     }
 
@@ -184,14 +173,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                         gotQueryMap = true
                         actions[index].add { value ->
-                            (value as Map<*, *>).forEach { (queryParamName, queryParamValue) ->
-                                if (queryParamName != null && queryParamValue != null) {
-                                    url.parameters.append(
-                                        queryParamName.toString(),
-                                        queryParamValue.toString()
-                                    )
-                                }
-                            }
+                            url.parameters.appendMap(value as Map<*, *>)
                         }
                     }
 
@@ -204,11 +186,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                         actions[index].add { value ->
                             val body = body as ParametersBuilder
-                            (value as Map<*, *>).forEach { (fieldName, fieldValue) ->
-                                if (fieldName != null && fieldValue != null) {
-                                    body.append(fieldName.toString(), fieldValue.toString())
-                                }
-                            }
+                            body.appendMap(value as Map<*, *>)
                         }
                     }
 
@@ -312,7 +290,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 if (arg != null) {
                     //enum
                     val value = if (arg is Enum<*>) {
-                        arg::class.java.getField(arg.name).getAnnotation(EncodeName::class.java)?.value ?: arg.name
+                        arg.javaClass.getField(arg.name).getAnnotation(EncodeName::class.java)?.value ?: arg.name
                     } else {
                         arg
                     }
@@ -323,4 +301,32 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             }
             postAction()
         }
+}
+
+@UseExperimental(InternalAPI::class)
+private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) {
+    when {
+        value.javaClass.isArray -> {
+            mutableListOf<String>().apply {
+                for (i in 0 until ArrayUtils.getLength(value)) {
+                    add(ArrayUtils.get(value, i).toString())
+                }
+            }
+        }
+        value is Iterable<*> -> value.map { it.toString() }
+        else -> listOf(value.toString())
+    }.let {
+        if (it.isNotEmpty()) {
+            appendAll(name, it)
+        }
+    }
+}
+
+@UseExperimental(InternalAPI::class)
+private fun StringValuesBuilder.appendMap(value: Map<*, *>) {
+    value.forEach { (key, value) ->
+        if (key != null && value != null) {
+            append(key.toString(), value.toString())
+        }
+    }
 }
