@@ -12,6 +12,8 @@ inline fun <reified T> T.assert(block: T.() -> T) {
     }
 }
 
+val JsonElement.header get() = obj["header"].string
+
 val JsonElement.url get() = obj["url"].string
 
 val JsonElement.method get() = obj["method"].string

@@ -163,6 +163,17 @@ interface Service {
     @Post
     @FormUrlEncoded
     suspend fun fieldWithArray(@Field args: IntArray = intArrayOf(1, 2, 3)): JsonElement
+
+    @Get
+    suspend fun queryParamWithNullableArray(@Query args: Array<Int?> = arrayOf(1, null, 2)): JsonElement
+
+    @Get
+    suspend fun queryParamWithEnumArray(
+        @Query args: Array<TestEnum> = arrayOf(
+            TestEnum.MY_NAME_VERY_LONG,
+            TestEnum.SORT
+        )
+    ): JsonElement
 }
 
 interface NoBaseUrl {
@@ -178,7 +189,10 @@ interface NoBaseUrl {
 
 enum class TestEnum {
     @EncodeName("sort")
-    MY_NAME_VERY_LONG
+    MY_NAME_VERY_LONG,
+
+    @EncodeName("long")
+    SORT
 }
 
 fun createHttpClient() = HttpClient(MockEngine) {
@@ -543,19 +557,23 @@ class Test {
     @Test
     fun headersWithoutValue() {
         runBlocking {
-            service.headersWithoutValue()
+            service.headersWithoutValue().header.assert {
+                "Headers [Key=[], Accept=[application/json], Accept-Charset=[UTF-8]]"
+            }
         }
     }
 
     @Test
     fun iterableArgs() {
         runBlocking {
-            service.queryParamWithArray()
-            service.queryParamWithObjectArray()
-            service.queryParamWithList()
-            service.queryParamWithVarargs()
-            service.queryParamWithEmpty()
-            service.fieldWithArray()
+            service.queryParamWithArray().url.assert { "https://localhost/?args=1&args=2&args=3" }
+            service.queryParamWithObjectArray().url.assert { "https://localhost/?args=1&args=2&args=3" }
+            service.queryParamWithList().url.assert { "https://localhost/?args=1&args=2&args=3" }
+            service.queryParamWithVarargs().url.assert { "https://localhost/?args=1&args=2&args=3" }
+            service.queryParamWithEmpty().url.assert { "https://localhost/?args=" }
+            service.fieldWithArray().contentLength.assert { "args=1&args=2&args=3".length }
+            service.queryParamWithNullableArray().url.assert { "https://localhost/?args=1&args=&args=2" }
+            service.queryParamWithEnumArray().url.assert { "https://localhost/?args=sort&args=long" }
         }
     }
 

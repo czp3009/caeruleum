@@ -161,7 +161,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                             error("@HeaderMap parameter type must be Map")
                         }
                         actions[index].add { value ->
-                            headers.appendMap(value as Map<*, *>)
+                            headers.appendMap(value)
                         }
                     }
 
@@ -173,7 +173,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                         gotQueryMap = true
                         actions[index].add { value ->
-                            url.parameters.appendMap(value as Map<*, *>)
+                            url.parameters.appendMap(value)
                         }
                     }
 
@@ -186,7 +186,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         }
                         actions[index].add { value ->
                             val body = body as ParametersBuilder
-                            body.appendMap(value as Map<*, *>)
+                            body.appendMap(value)
                         }
                     }
 
@@ -288,14 +288,8 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {
-                    //enum
-                    val value = if (arg is Enum<*>) {
-                        arg.javaClass.getField(arg.name).getAnnotation(EncodeName::class.java)?.value ?: arg.name
-                    } else {
-                        arg
-                    }
                     actions[index].forEach {
-                        it(value)
+                        it(arg)
                     }
                 }
             }
@@ -303,28 +297,37 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         }
 }
 
+private fun Any.parseEnum() = if (this is Enum<*>) {
+    javaClass.getField(name).getAnnotation(EncodeName::class.java)?.value ?: name
+} else {
+    toString()
+}
+
+@JvmName("parseNullableEnum")
+private fun Any?.parseEnum() = this?.parseEnum() ?: ""
+
 @UseExperimental(InternalAPI::class)
-private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) {
-    when {
-        value.javaClass.isArray -> {
-            mutableListOf<String>().apply {
-                for (i in 0 until ArrayUtils.getLength(value)) {
-                    add(ArrayUtils.get(value, i).toString())
-                }
+private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) = when {
+    value.javaClass.isArray -> {
+        mutableListOf<String>().apply {
+            for (i in 0 until ArrayUtils.getLength(value)) {
+                //platform type
+                @Suppress("USELESS_CAST")
+                add((ArrayUtils.get(value, i) as Any?).parseEnum())
             }
         }
-        value is Iterable<*> -> value.map { it.toString() }
-        else -> listOf(value.toString())
-    }.let {
-        if (it.isNotEmpty()) {
-            appendAll(name, it)
-        }
+    }
+    value is Iterable<*> -> value.map { it.parseEnum() }
+    else -> listOf(value.parseEnum())
+}.let {
+    if (it.isNotEmpty()) {
+        appendAll(name, it)
     }
 }
 
 @UseExperimental(InternalAPI::class)
-private fun StringValuesBuilder.appendMap(value: Map<*, *>) {
-    value.forEach { (key, value) ->
+private fun StringValuesBuilder.appendMap(value: Any) {
+    (value as Map<*, *>).forEach { (key, value) ->
         if (key != null && value != null) {
             append(key.toString(), value.toString())
         }
