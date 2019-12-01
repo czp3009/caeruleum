@@ -49,12 +49,12 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     private val preAction: HttpRequestBuilder.() -> Unit
     private val postAction: HttpRequestBuilder.() -> Unit
     private val particlePathAction: URLBuilder.() -> Unit
+    private var particlePath = ""
 
     init {
         var isFormUrlEncoded = false
         var isMultipart = false
         var httpMethod: HttpMethod? = null
-        var particlePath = ""
         fun parseHttpMethodAndPath(method: HttpMethod, path: String) {
             if (httpMethod != null) error("Only one HTTP method is allowed")
             httpMethod = method
@@ -284,7 +284,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
             (baseUrlAnnotationValue ?: baseUrl)?.let {
                 url.takeFrom(URLBuilder(it).apply { particlePathAction() })
-            }
+            } ?: if (particlePath.isNotEmpty()) url.takeFrom(particlePath)
             preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {

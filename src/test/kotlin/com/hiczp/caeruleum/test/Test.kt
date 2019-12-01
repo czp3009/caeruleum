@@ -185,6 +185,9 @@ interface NoBaseUrl {
 
     @Get
     suspend fun dynamic(@Url url: String = LOCALHOST): JsonElement
+
+    @Get(LOCALHOST + "path")
+    suspend fun urlInGet(): JsonElement
 }
 
 enum class TestEnum {
@@ -511,6 +514,16 @@ class Test {
         runBlocking {
             dynamicUrl.dynamic().url.assert {
                 LOCALHOST
+            }
+        }
+    }
+
+    @Test
+    fun urlInGet() {
+        val dynamicUrl = httpClient.create<NoBaseUrl>()
+        runBlocking {
+            dynamicUrl.urlInGet().url.assert {
+                LOCALHOST + "path"
             }
         }
     }
