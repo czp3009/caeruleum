@@ -26,7 +26,7 @@ tasks.withType<KotlinCompile> {
     kotlinOptions {
         jvmTarget = Java.version
         freeCompilerArgs = listOf(
-            "-Xuse-experimental=kotlin.Experimental",
+            "-Xopt-in=kotlin.RequiresOptIn",
             "-Xjvm-default=enable"
         )
     }

@@ -1,6 +1,7 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.HttpClient
+import io.ktor.client.statement.HttpStatement
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
@@ -49,11 +50,11 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     // Because the service interface might not be public, we need to use a MethodHandle lookup
                     // that ignores the visibility of the declaringClass
                     MethodHandles.Lookup::class.java.getDeclaredConstructor(
-                        Class::class.java,
-                        Int::class.javaPrimitiveType
-                    ).apply {
-                        setAccessible(true)
-                    }.newInstance(javaClass, -1)
+                            Class::class.java,
+                            Int::class.javaPrimitiveType
+                        ).apply {
+                            setAccessible(true)
+                        }.newInstance(javaClass, -1)
                         .unreflectSpecial(method, javaClass)
                         .bindTo(proxy)
                         .invokeWithArguments(*args.orEmpty())
@@ -76,15 +77,19 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     val realArgs = args.copyOf(args.size - 1)
                     httpClient.launch {
                         runCatching {
-                            httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, realArgs))
-                                .receive(serviceFunction.returnTypeInfo)
+                            HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, realArgs), httpClient)
+                                .execute {
+                                    it.call.receive(serviceFunction.returnTypeInfo)
+                                }
                         }.run(continuation::resumeWith)
                     }
                     COROUTINE_SUSPENDED
                 } else {
                     httpClient.async {
-                        httpClient.execute(serviceFunction.httpRequestBuilder(baseUrl, args.orEmpty()))
-                            .receive(serviceFunction.returnTypeInfo)
+                        HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, args.orEmpty()), httpClient)
+                            .execute {
+                                it.call.receive(serviceFunction.returnTypeInfo)
+                            }
                     }
                 }
             }

@@ -24,7 +24,7 @@ interface GitHubService {
     suspend fun listRepos(@Path user: String): JsonElement
 }
 
-@UseExperimental(KtorExperimentalAPI::class)
+@OptIn(KtorExperimentalAPI::class)
 val httpClient = HttpClient(CIO) {
     install(JsonFeature) {
         serializer = GsonSerializer()

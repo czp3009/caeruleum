@@ -45,7 +45,11 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     private val actions = Array(kFunction.valueParameters.size) {
         mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>()
     }
-    private val defaultHttpRequestBuilder = HttpRequestBuilder()
+
+    private val headers = HeadersBuilder()
+    private var httpMethod: HttpMethod? = null
+    private val attributes = Attributes(concurrent = false)
+
     private val preAction: HttpRequestBuilder.() -> Unit
     private val postAction: HttpRequestBuilder.() -> Unit
     private val particlePathAction: URLBuilder.() -> Unit
@@ -54,15 +58,11 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     init {
         var isFormUrlEncoded = false
         var isMultipart = false
-        var httpMethod: HttpMethod? = null
         fun parseHttpMethodAndPath(method: HttpMethod, path: String) {
             if (httpMethod != null) error("Only one HTTP method is allowed")
             httpMethod = method
             particlePath = path
         }
-
-        val headers = HeadersBuilder()
-        val attributes = Attributes(concurrent = false)
 
         kFunction.annotations.forEach {
             when (it) {
@@ -252,15 +252,6 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             {}
         }
 
-        defaultHttpRequestBuilder.apply {
-            this.headers.appendAll(headers)
-            method = httpMethod!!
-            attributes.allKeys.forEach {
-                @Suppress("UNCHECKED_CAST")
-                this.attributes.put(it as AttributeKey<Any>, attributes[it])
-            }
-        }
-
         when {
             isFormUrlEncoded -> {
                 preAction = { body = ParametersBuilder() }
@@ -281,7 +272,14 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
     private val baseUrlAnnotationValue = kClass.findAnnotation<BaseUrl>()?.value
 
     fun httpRequestBuilder(baseUrl: String?, args: Array<out Any?>) =
-        HttpRequestBuilder().takeFrom(defaultHttpRequestBuilder).apply {
+        HttpRequestBuilder().apply {
+            this.headers.appendAll(headers)
+            method = httpMethod!!
+            attributes.allKeys.forEach {
+                @Suppress("UNCHECKED_CAST")
+                this.attributes.put(it as AttributeKey<Any>, attributes[it])
+            }
+        }.apply {
             (baseUrlAnnotationValue ?: baseUrl)?.let {
                 url.takeFrom(URLBuilder(it).apply { particlePathAction() })
             } ?: if (particlePath.isNotEmpty()) url.takeFrom(particlePath)
@@ -306,7 +304,7 @@ private fun Any.parseEnum() = if (this is Enum<*>) {
 @JvmName("parseNullableEnum")
 private fun Any?.parseEnum() = this?.parseEnum() ?: ""
 
-@UseExperimental(InternalAPI::class)
+@OptIn(InternalAPI::class)
 private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) = when {
     value.javaClass.isArray -> {
         mutableListOf<String>().apply {
@@ -325,7 +323,7 @@ private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) = 
     }
 }
 
-@UseExperimental(InternalAPI::class)
+@OptIn(InternalAPI::class)
 private fun StringValuesBuilder.appendMap(value: Any) {
     (value as Map<*, *>).forEach { (key, value) ->
         if (key != null && value != null) {

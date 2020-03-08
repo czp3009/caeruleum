@@ -13,16 +13,16 @@ import io.ktor.client.features.ClientRequestException
 import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.logging.LogLevel
 import io.ktor.client.features.logging.Logging
-import io.ktor.client.response.HttpResponse
+import io.ktor.client.statement.HttpResponse
 import io.ktor.content.TextContent
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.io.ByteReadChannel
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Test
@@ -571,7 +571,7 @@ class Test {
     fun headersWithoutValue() {
         runBlocking {
             service.headersWithoutValue().header.assert {
-                "Headers [Key=[], Accept=[application/json], Accept-Charset=[UTF-8]]"
+                "Headers [Accept=[application/json], Accept-Charset=[UTF-8]]"
             }
         }
     }
