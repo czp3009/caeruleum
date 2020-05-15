@@ -4,7 +4,7 @@ Retrofit inspired Http client base on ktor-client.
 # Gradle
 ```groovy
 // https://mvnrepository.com/artifact/com.hiczp/caeruleum
-compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.9'
+compile group: 'com.hiczp', name: 'caeruleum', version: '1.2.10'
 ```
 
 # Usage

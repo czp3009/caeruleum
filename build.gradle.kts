@@ -128,7 +128,3 @@ publishing {
 signing {
     sign(publishing.publications["mavenJava"])
 }
-
-gradle.taskGraph.whenReady {
-    tasks["signMavenJavaPublication"].onlyIf { hasTask("publish") }
-}
