@@ -185,6 +185,16 @@ interface NoBaseUrl {
 
     @Get(LOCALHOST + "path")
     suspend fun urlInGet(): JsonElement
+
+    companion object {
+        const val baseUrl = "https://test.com/"
+    }
+}
+
+@BaseUrl(LOCALHOST)
+interface ProgrammaticBaseUrl {
+    @Get
+    suspend fun get(): JsonElement
 }
 
 enum class TestEnum {
@@ -471,10 +481,10 @@ class Test {
 
     @Test
     fun dynamicBaseUrl() {
-        val dynamicBaseUrl = httpClient.create<NoBaseUrl>(LOCALHOST)
+        val dynamicBaseUrl = httpClient.create<NoBaseUrl>(NoBaseUrl.baseUrl)
         runBlocking {
             dynamicBaseUrl.get().url.assert {
-                LOCALHOST
+                NoBaseUrl.baseUrl
             }
         }
     }
@@ -483,8 +493,8 @@ class Test {
     fun dynamicUrl() {
         val dynamicUrl = httpClient.create<NoBaseUrl>()
         runBlocking {
-            dynamicUrl.dynamic().url.assert {
-                LOCALHOST
+            dynamicUrl.dynamic(NoBaseUrl.baseUrl).url.assert {
+                NoBaseUrl.baseUrl
             }
         }
     }
@@ -568,6 +578,19 @@ class Test {
                 Gson().fromJson<JsonObject>(it)
             }.body.assert {
                 "\"HelloWorld\""
+            }
+        }
+    }
+
+    @Test
+    fun programmaticBaseUrl() {
+        runBlocking {
+            createHttpClient().use {
+                it.create<ProgrammaticBaseUrl>().get().url.assert { LOCALHOST }
+            }
+            val baseUrl = "https://test.com/"
+            createHttpClient().use {
+                it.create<ProgrammaticBaseUrl>(baseUrl).get().url.assert { baseUrl }
             }
         }
     }

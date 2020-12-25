@@ -280,7 +280,8 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 this.attributes.put(it as AttributeKey<Any>, attributes[it])
             }
         }.apply {
-            (baseUrlAnnotationValue ?: baseUrl)?.let {
+            //if no url set, ktor will use localhost as host
+            (baseUrl ?: baseUrlAnnotationValue)?.let {
                 url.takeFrom(URLBuilder(it).apply { particlePathAction() })
             } ?: if (particlePath.isNotEmpty()) url.takeFrom(particlePath)
             preAction()
