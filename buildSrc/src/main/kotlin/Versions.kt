@@ -1,7 +1,7 @@
 import org.gradle.api.JavaVersion
 
 object Project {
-    const val version = "2.0.0-SNAPSHOT"
+    const val version = "1.3.0"
 }
 
 object Kotlin {
@@ -9,7 +9,7 @@ object Kotlin {
 }
 
 object Ktor {
-    const val version = "1.4.3"
+    const val version = "1.5.0"
 }
 
 object Java {
