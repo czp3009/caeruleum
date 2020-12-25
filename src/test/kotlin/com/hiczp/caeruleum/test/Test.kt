@@ -1,25 +1,24 @@
 package com.hiczp.caeruleum.test
 
+import com.github.salomonbrys.kotson.fromJson
 import com.github.salomonbrys.kotson.jsonObject
+import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.hiczp.caeruleum.annotation.*
+import com.hiczp.caeruleum.annotation.Headers
+import com.hiczp.caeruleum.annotation.Url
 import com.hiczp.caeruleum.create
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.engine.mock.respondError
-import io.ktor.client.features.ClientRequestException
-import io.ktor.client.features.json.JsonFeature
-import io.ktor.client.features.logging.LogLevel
-import io.ktor.client.features.logging.Logging
-import io.ktor.client.statement.HttpResponse
-import io.ktor.content.TextContent
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
-import io.ktor.utils.io.ByteReadChannel
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.features.*
+import io.ktor.client.features.json.*
+import io.ktor.client.features.logging.*
+import io.ktor.client.statement.*
+import io.ktor.content.*
+import io.ktor.http.*
+import io.ktor.util.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -174,6 +173,9 @@ interface Service {
             TestEnum.SORT
         )
     ): JsonElement
+
+    @Post
+    suspend fun returnWithHttpResponse(@Body body: String = "HelloWorld"): HttpResponse
 }
 
 interface NoBaseUrl {
@@ -198,6 +200,7 @@ enum class TestEnum {
     SORT
 }
 
+@OptIn(KtorExperimentalAPI::class)
 fun createHttpClient() = HttpClient(MockEngine) {
     engine {
         addHandler {
@@ -209,7 +212,8 @@ fun createHttpClient() = HttpClient(MockEngine) {
                             "header" to it.headers.toString(),
                             "method" to it.method.value,
                             "url" to it.url.toString(),
-                            "contentLength" to it.body.contentLength
+                            "contentLength" to it.body.contentLength,
+                            "body" to it.body.toByteReadPacket().readText()
                         ).toString()
                     ),
                     headers = headersOf("Content-Type", ContentType.Application.Json.toString())
@@ -270,29 +274,29 @@ class Test {
 
     @Test
     fun postFormUrlEncoded() = runBlocking {
-        service.postFormUrlEncoded("01", "02").await().contentLength.assert {
-            "arg1=01&czp=02".length
+        service.postFormUrlEncoded("01", "02").await().body.assert {
+            "arg1=01&czp=02"
         }
     }
 
     @Test
     fun repeatPost() = runBlocking {
-        service.postFormUrlEncoded("001", "002").await().contentLength.assert {
-            "arg1=001&czp=002".length
+        service.postFormUrlEncoded("001", "002").await().body.assert {
+            "arg1=001&czp=002"
         }
     }
 
     @Test
     fun postWithNullValue() = runBlocking {
-        service.postFormUrlEncoded("01").await().contentLength.assert {
-            "arg1=01".length
+        service.postFormUrlEncoded("01").await().body.assert {
+            "arg1=01"
         }
     }
 
     @Test
     fun postEmptyContent() = runBlocking {
-        service.postEmptyContent().await().contentLength.assert {
-            0
+        service.postEmptyContent().await().body.assert {
+            ""
         }
     }
 
@@ -303,8 +307,8 @@ class Test {
                 "arg1" to "02",
                 "arg2" to "01"
             )
-        ).await().contentLength.assert {
-            "arg1=02&arg2=01".length
+        ).await().body.assert {
+            "arg1=02&arg2=01"
         }
     }
 
@@ -317,8 +321,8 @@ class Test {
 
     @Test
     fun postWithoutBody() = runBlocking {
-        service.postWithoutBody().await().contentLength.assert {
-            0
+        service.postWithoutBody().await().body.assert {
+            ""
         }
     }
 
@@ -356,8 +360,8 @@ class Test {
         val jsonObject = jsonObject(
             "key1" to "value1"
         )
-        service.postJson(jsonObject).await().contentLength.assert {
-            jsonObject.toString().length
+        service.postJson(jsonObject).await().body.assert {
+            jsonObject.toString()
         }
     }
 
@@ -384,8 +388,8 @@ class Test {
 
     @Test
     fun filedEncode() = runBlocking {
-        service.fieldEncode().await().contentLength.assert {
-            "param1=1+2%21%2B%2F".length
+        service.fieldEncode().await().body.assert {
+            "param1=1+2%21%2B%2F"
         }
     }
 
@@ -437,7 +441,7 @@ class Test {
         val jsonObject = jsonObject(
             "a" to 1
         )
-        service.suspendPost(jsonObject).contentLength.assert { jsonObject.toString().length }
+        service.suspendPost(jsonObject).body.assert { jsonObject.toString() }
     }
 
     @Test
@@ -584,9 +588,20 @@ class Test {
             service.queryParamWithList().url.assert { "https://localhost/?args=1&args=2&args=3" }
             service.queryParamWithVarargs().url.assert { "https://localhost/?args=1&args=2&args=3" }
             service.queryParamWithEmpty().url.assert { "https://localhost/?args=" }
-            service.fieldWithArray().contentLength.assert { "args=1&args=2&args=3".length }
+            service.fieldWithArray().body.assert { "args=1&args=2&args=3" }
             service.queryParamWithNullableArray().url.assert { "https://localhost/?args=1&args=&args=2" }
             service.queryParamWithEnumArray().url.assert { "https://localhost/?args=sort&args=long" }
+        }
+    }
+
+    @Test
+    fun returnWithHttpResponse() {
+        runBlocking {
+            service.returnWithHttpResponse().content.readUTF8Line()!!.let {
+                Gson().fromJson<JsonObject>(it)
+            }.body.assert {
+                "\"HelloWorld\""
+            }
         }
     }
 

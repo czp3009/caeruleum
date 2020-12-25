@@ -72,7 +72,7 @@ Array, Iterable and varargs are equivalent.
 
 If element in Array is null, empty String will be used. e.g "args=1&args=&args=2"
 
-Also available with `@Field`.
+Same with `@Field`.
 
 ## Can i use @Query and @Field in same argument?
 Of course.
@@ -82,7 +82,7 @@ Of course.
 suspend fun multiAnnotation(@Query @Field arg: String)
 ```
 
-And even like this:
+And also like this:
 ```kotlin
 @Post
 @FormUrlEncoded
@@ -110,7 +110,8 @@ Just use ktor provided type `OutgoingContent` as body.
 suspend fun someFunc()
 ```
 
-Important: DON'T use `Attributes.contains` to check is a `AttributeKey` exists, this method only compare reference. Get all keys in it and `findAny` instead.
+Important: DON'T use `Attributes.contains` to check if a `AttributeKey` exists, this method only compare reference. Get
+all keys in it and use `findAny` instead.
 
 # License
 Apache License 2.0

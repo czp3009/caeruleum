@@ -19,3 +19,5 @@ val JsonElement.url get() = obj["url"].string
 val JsonElement.method get() = obj["method"].string
 
 val JsonElement.contentLength get() = obj["contentLength"].nullInt
+
+val JsonElement.body get() = obj["body"].string
