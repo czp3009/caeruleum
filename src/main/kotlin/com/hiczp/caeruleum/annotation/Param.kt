@@ -24,9 +24,10 @@ annotation class HeaderMap
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 @Repeatable
-annotation class Query(val value: String = "")
+annotation class Query(vararg val value: String = [""])
 
 //Container of Query
+@Deprecated("use @Query instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Queries(vararg val value: Query)
@@ -38,9 +39,10 @@ annotation class QueryMap
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 @Repeatable
-annotation class Field(val value: String = "")
+annotation class Field(vararg val value: String = [""])
 
 //Container of Field
+@Deprecated("use @Field instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Fields(vararg val value: Field)

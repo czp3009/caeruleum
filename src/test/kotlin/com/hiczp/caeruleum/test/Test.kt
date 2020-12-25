@@ -9,15 +9,10 @@ import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import com.hiczp.caeruleum.create
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
 import io.ktor.client.features.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.logging.*
 import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -198,34 +193,6 @@ enum class TestEnum {
 
     @EncodeName("long")
     SORT
-}
-
-@OptIn(KtorExperimentalAPI::class)
-fun createHttpClient() = HttpClient(MockEngine) {
-    engine {
-        addHandler {
-            when (it.url.encodedPath) {
-                "/notFound" -> respondError(HttpStatusCode.NotFound)
-                else -> respond(
-                    ByteReadChannel(
-                        jsonObject(
-                            "header" to it.headers.toString(),
-                            "method" to it.method.value,
-                            "url" to it.url.toString(),
-                            "contentLength" to it.body.contentLength,
-                            "body" to it.body.toByteReadPacket().readText()
-                        ).toString()
-                    ),
-                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
-                )
-            }
-        }
-    }
-
-    install(JsonFeature)
-    install(Logging) {
-        level = LogLevel.ALL
-    }
 }
 
 @TestMethodOrder(NatureOrder::class)
