@@ -9,7 +9,7 @@ object Kotlin {
 }
 
 object Ktor {
-    const val version = "1.4.3"
+    const val version = "1.5.0"
 }
 
 object Java {
