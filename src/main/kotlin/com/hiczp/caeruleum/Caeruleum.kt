@@ -1,10 +1,8 @@
 package com.hiczp.caeruleum
 
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.HttpStatement
-import io.ktor.util.*
+import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
@@ -53,11 +51,11 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     // Because the service interface might not be public, we need to use a MethodHandle lookup
                     // that ignores the visibility of the declaringClass
                     MethodHandles.Lookup::class.java.getDeclaredConstructor(
-                            Class::class.java,
-                            Int::class.javaPrimitiveType
-                        ).apply {
-                            setAccessible(true)
-                        }.newInstance(javaClass, -1)
+                        Class::class.java,
+                        Int::class.javaPrimitiveType
+                    ).apply {
+                        setAccessible(true)
+                    }.newInstance(javaClass, -1)
                         .unreflectSpecial(method, javaClass)
                         .bindTo(proxy)
                         .invokeWithArguments(*args.orEmpty())
@@ -81,14 +79,14 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     httpClient.launch {
                         runCatching {
                             HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, realArgs), httpClient)
-                                .execute().call.receive(serviceFunction.returnTypeInfo)
+                                .executeAndReceive(serviceFunction.returnTypeInfo)
                         }.run(continuation::resumeWith)
                     }
                     COROUTINE_SUSPENDED
                 } else {
                     httpClient.async {
                         HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, args.orEmpty()), httpClient)
-                            .execute().call.receive(serviceFunction.returnTypeInfo)
+                            .executeAndReceive(serviceFunction.returnTypeInfo)
                     }
                 }
             }
@@ -98,3 +96,9 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
 
 inline fun <reified T> HttpClient.create(baseUrl: String? = null) =
     dynamicProxyToHttpClient(T::class, this, baseUrl) as T
+
+private suspend inline fun HttpStatement.executeAndReceive(returnTypeInfo: TypeInfo) = when (returnTypeInfo.type) {
+    HttpStatement::class -> this
+    HttpResponse::class -> execute()
+    else -> execute { it.call.receive(returnTypeInfo) }
+}

@@ -171,6 +171,9 @@ interface Service {
 
     @Post
     suspend fun returnWithHttpResponse(@Body body: String = "HelloWorld"): HttpResponse
+
+    @Post
+    suspend fun returnWithHttpStatement(@Body body: JsonObject): HttpStatement
 }
 
 interface NoBaseUrl {
@@ -579,6 +582,14 @@ class Test {
             }.body.assert {
                 "\"HelloWorld\""
             }
+        }
+    }
+
+    @Test
+    fun returnWithHttpStatement() {
+        val jsonObject = jsonObject("key" to "value")
+        runBlocking {
+            service.returnWithHttpStatement(jsonObject).receive<JsonObject>().body.assert { jsonObject.toString() }
         }
     }
 
