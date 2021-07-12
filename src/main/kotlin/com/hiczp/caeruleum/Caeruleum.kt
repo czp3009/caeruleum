@@ -1,8 +1,8 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.statement.*
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
@@ -21,7 +21,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
     require(javaClass.isInterface) { "API declarations must be interfaces" }
     require(javaClass.interfaces.isEmpty()) { "API interfaces must not extend other interfaces" }
 
-    return newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
+    return newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args: Array<Any>? ->
         if (!httpClient.isActive) throw CancellationException("Parent context in HttpClient is cancelled")
 
         val kFunction = method.kotlinFunction
@@ -35,7 +35,7 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     args == null -> false
                     args[0] === proxy -> true
                     args[0] !is java.lang.reflect.Proxy -> false
-                    else -> args[0]!!.javaClass.interfaces.let {
+                    else -> args[0].javaClass.interfaces.let {
                         if (it.size != 1) false else it[0] == javaClass
                     }
                 }

@@ -1,6 +1,7 @@
 package com.hiczp.caeruleum.test
 
 import com.github.salomonbrys.kotson.fromJson
+import com.github.salomonbrys.kotson.jsonArray
 import com.github.salomonbrys.kotson.jsonObject
 import com.google.gson.Gson
 import com.google.gson.JsonElement
@@ -64,10 +65,8 @@ interface Service {
 
     suspend fun nonAbstractAndSuspend(arg1: String) = arg1
 
-    @JvmDefault
     fun jvmDefault(arg1: String) = arg1
 
-    @JvmDefault
     suspend fun jvmDefaultAndSuspend(arg1: String) = arg1
 
     @Post
@@ -119,6 +118,7 @@ interface Service {
     @FormUrlEncoded
     suspend fun multiAnnotation(@Query("arg1") @Field("arg2") arg: String = "!")
 
+    @Suppress("DEPRECATION")
     @Post
     @FormUrlEncoded
     suspend fun containerAnnotation(
@@ -174,6 +174,13 @@ interface Service {
 
     @Post
     suspend fun returnWithHttpStatement(@Body body: JsonObject): HttpStatement
+
+    @Get("/onlyReturnBody")
+    suspend fun genericTypeReturnValue(
+        @Body body: JsonObject = jsonObject(
+            "array" to jsonArray(1, 2, 3)
+        )
+    ): Map<String, Array<Int>>
 }
 
 interface NoBaseUrl {
@@ -590,6 +597,14 @@ class Test {
         val jsonObject = jsonObject("key" to "value")
         runBlocking {
             service.returnWithHttpStatement(jsonObject).receive<JsonObject>().body.assert { jsonObject.toString() }
+        }
+    }
+
+    @Test
+    fun genericTypeReturnValue() {
+        runBlocking {
+            val array = service.genericTypeReturnValue()["array"]!!
+            assert(array.contentEquals(arrayOf(1, 2, 3)))
         }
     }
 

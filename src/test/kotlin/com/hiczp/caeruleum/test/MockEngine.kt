@@ -6,17 +6,21 @@ import io.ktor.client.engine.mock.*
 import io.ktor.client.features.json.*
 import io.ktor.client.features.logging.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.utils.io.*
 
-@OptIn(KtorExperimentalAPI::class)
+private val jsonResponseHeaders = headersOf("Content-Type", ContentType.Application.Json.toString())
+
 fun createHttpClient() = HttpClient(MockEngine) {
     engine {
         addHandler {
             when (it.url.encodedPath) {
                 "/notFound" -> respondError(HttpStatusCode.NotFound)
+                "/onlyReturnBody" -> respond(
+                    content = it.body.toByteReadPacket().readText(),
+                    headers = jsonResponseHeaders
+                )
                 else -> respond(
-                    ByteReadChannel(
+                    content = ByteReadChannel(
                         jsonObject(
                             "header" to it.headers.toString(),
                             "method" to it.method.value,
@@ -25,7 +29,7 @@ fun createHttpClient() = HttpClient(MockEngine) {
                             "body" to it.body.toByteReadPacket().readText()
                         ).toString()
                     ),
-                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
+                    headers = jsonResponseHeaders
                 )
             }
         }

@@ -3,12 +3,12 @@ package com.hiczp.caeruleum
 import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.util.*
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -18,7 +18,7 @@ import kotlin.reflect.jvm.jvmErasure
 
 private val jobType = Job::class.createType()
 private val mapType = Map::class.starProjectedType
-private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
+private val anyTypeInfo = typeInfo<Any>()
 
 @Suppress("MemberVisibilityCanBePrivate")
 internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
@@ -33,9 +33,9 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
 
     val returnTypeInfo = with(kFunction.returnType) {
         if (isJob) {
-            arguments.firstOrNull()?.type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
+            arguments.firstOrNull()?.type?.let { typeInfoImpl(it.javaType, it.jvmErasure, it) } ?: anyTypeInfo
         } else {
-            TypeInfo(this.jvmErasure, this.javaType)
+            typeInfoImpl(this.javaType, this.jvmErasure, this)
         }
     }
     private val actions = Array(kFunction.valueParameters.size) {
@@ -100,7 +100,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
         var gotQueryMap = false
         var gotBody = false
         kFunction.valueParameters.forEachIndexed { index, kParameter ->
-            fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
+            fun String.orParameterName() = ifEmpty { kParameter.name ?: this }
 
             kParameter.annotations.forEach { annotation ->
                 fun parseQuery(annotationValues: Array<out String>) {

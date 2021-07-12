@@ -1,0 +1,69 @@
+buildscript {
+    repositories {
+        gradlePluginPortal()
+    }
+
+    dependencies {
+        // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-gradle-plugin
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.20'
+    }
+}
+
+group = 'com.hiczp'
+version = '2.0.0-SNAPSHOT'
+description = 'Retrofit inspired Http client base on ktor-client'
+
+apply plugin: 'kotlin'
+
+repositories {
+    mavenCentral()
+}
+
+//kotlin
+dependencies {
+    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
+    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib'
+    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect
+    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
+}
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8
+        freeCompilerArgs = ['-Xjvm-default=all']
+    }
+}
+compileTestKotlin {
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8
+        freeCompilerArgs = ['-Xjvm-default=all']
+    }
+}
+
+//ktor
+def ktor_version = '1.6.1'
+dependencies {
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core-jvm
+    implementation group: 'io.ktor', name: 'ktor-client-core-jvm', version: ktor_version
+}
+
+//test
+dependencies {
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
+    testImplementation group: 'io.ktor', name: 'ktor-client-cio', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
+    testImplementation group: 'io.ktor', name: 'ktor-client-gson', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging-jvm
+    testImplementation group: 'io.ktor', name: 'ktor-client-logging-jvm', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
+    testImplementation group: 'io.ktor', name: 'ktor-client-mock-jvm', version: ktor_version
+    // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson
+    testImplementation group: 'com.github.salomonbrys.kotson', name: 'kotson', version: '2.5.0'
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
+    testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
+    // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter', version: '5.7.0'
+}
+
+test {
+    useJUnitPlatform()
+}
