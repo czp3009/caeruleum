@@ -5,7 +5,7 @@ buildscript {
 
     dependencies {
         // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-gradle-plugin
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.20'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21'
     }
 }
 
@@ -26,24 +26,26 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
 }
+def jvm_target = JavaVersion.VERSION_1_8
+def compiler_args=['-Xjvm-default=all','-Xopt-in=kotlin.RequiresOptIn']
 compileKotlin {
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-        freeCompilerArgs = ['-Xjvm-default=all']
+        jvmTarget = jvm_target
+        freeCompilerArgs = compiler_args
     }
 }
 compileTestKotlin {
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
-        freeCompilerArgs = ['-Xjvm-default=all']
+        jvmTarget = jvm_target
+        freeCompilerArgs = compiler_args
     }
 }
 
 //ktor
 def ktor_version = '1.6.1'
 dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core-jvm
-    implementation group: 'io.ktor', name: 'ktor-client-core-jvm', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core
+    implementation group: 'io.ktor', name: 'ktor-client-core', version: ktor_version
 }
 
 //test
@@ -52,10 +54,10 @@ dependencies {
     testImplementation group: 'io.ktor', name: 'ktor-client-cio', version: ktor_version
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
     testImplementation group: 'io.ktor', name: 'ktor-client-gson', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging-jvm
-    testImplementation group: 'io.ktor', name: 'ktor-client-logging-jvm', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
-    testImplementation group: 'io.ktor', name: 'ktor-client-mock-jvm', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging
+    testImplementation group: 'io.ktor', name: 'ktor-client-logging', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock
+    testImplementation group: 'io.ktor', name: 'ktor-client-mock', version: ktor_version
     // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson
     testImplementation group: 'com.github.salomonbrys.kotson', name: 'kotson', version: '2.5.0'
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
