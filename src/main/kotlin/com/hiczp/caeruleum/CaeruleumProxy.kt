@@ -86,6 +86,7 @@ class CaeruleumProxy(
                 val serviceFunction = ServiceFunction(kClass, kFunction)
                 if (serviceFunction.isSuspend) {
                     { args ->
+                        @Suppress("UNCHECKED_CAST")
                         val continuation = args!!.last() as Continuation<Any>
                         val realArgs = args.copyOfRange(0, args.size - 1)
                         httpClient.launch {

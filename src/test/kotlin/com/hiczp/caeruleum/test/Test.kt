@@ -118,6 +118,10 @@ interface Service {
     @FormUrlEncoded
     suspend fun multiAnnotation(@Query("arg1") @Field("arg2") arg: String = "!")
 
+//    //not support yet
+//    @Get
+//    suspend fun repeatableAnnotation(@Query("arg1") @Query("arg2") arg: String = "!")
+
     @Suppress("DEPRECATION")
     @Post
     @FormUrlEncoded
