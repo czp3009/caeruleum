@@ -20,14 +20,13 @@ annotation class HeaderMap
 
 //Repeatable is not support, see below
 //https://youtrack.jetbrains.com/issue/KT-12794?_ga=2.40144167.443754125.1569230332-295160856.1538112684
-//Use container instead
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 @Repeatable
 annotation class Query(vararg val value: String = [""])
 
 //Container of Query
-@Deprecated("use @Query instead")
+//@Deprecated("use @Query instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Queries(vararg val value: Query)
@@ -42,7 +41,7 @@ annotation class QueryMap
 annotation class Field(vararg val value: String = [""])
 
 //Container of Field
-@Deprecated("use @Field instead")
+//@Deprecated("use @Field instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Fields(vararg val value: Field)
