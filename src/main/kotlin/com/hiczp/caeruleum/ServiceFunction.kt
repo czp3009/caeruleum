@@ -3,14 +3,11 @@ package com.hiczp.caeruleum
 import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
-import io.ktor.client.call.TypeInfo
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.forms.FormDataContent
-import io.ktor.client.request.forms.FormPart
-import io.ktor.client.request.forms.MultiPartFormDataContent
-import io.ktor.client.request.forms.formData
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
-import io.ktor.http.content.OutgoingContent
+import io.ktor.http.content.*
 import io.ktor.util.*
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
@@ -18,7 +15,6 @@ import kotlin.reflect.KFunction
 import kotlin.reflect.full.*
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.jvmErasure
-import java.lang.reflect.Array as ArrayUtils
 
 private val jobType = Job::class.createType()
 private val mapType = Map::class.starProjectedType
@@ -107,19 +103,23 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
 
             kParameter.annotations.forEach { annotation ->
-                fun parseQuery(annotationValue: String) {
-                    val name = annotationValue.orParameterName()
-                    gotQuery = true
-                    actions[index].add { value ->
-                        url.parameters.appendIterableValue(name, value)
+                fun parseQuery(annotationValues: Array<out String>) {
+                    annotationValues.forEach {
+                        val name = it.orParameterName()
+                        gotQuery = true
+                        actions[index].add { value ->
+                            url.parameters.appendIterableValue(name, value)
+                        }
                     }
                 }
 
-                fun parseField(annotationValue: String) {
+                fun parseField(annotationValues: Array<out String>) {
                     if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
-                    val name = annotationValue.orParameterName()
-                    actions[index].add { value ->
-                        (body as ParametersBuilder).appendIterableValue(name, value)
+                    annotationValues.forEach {
+                        val name = it.orParameterName()
+                        actions[index].add { value ->
+                            (body as ParametersBuilder).appendIterableValue(name, value)
+                        }
                     }
                 }
 
@@ -280,7 +280,8 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                 this.attributes.put(it as AttributeKey<Any>, attributes[it])
             }
         }.apply {
-            (baseUrlAnnotationValue ?: baseUrl)?.let {
+            //if no url set, ktor will use localhost as host
+            (baseUrl ?: baseUrlAnnotationValue)?.let {
                 url.takeFrom(URLBuilder(it).apply { particlePathAction() })
             } ?: if (particlePath.isNotEmpty()) url.takeFrom(particlePath)
             preAction()
@@ -293,41 +294,4 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
             }
             postAction()
         }
-}
-
-private fun Any.parseEnum() = if (this is Enum<*>) {
-    javaClass.getField(name).getAnnotation(EncodeName::class.java)?.value ?: name
-} else {
-    toString()
-}
-
-@JvmName("parseNullableEnum")
-private fun Any?.parseEnum() = this?.parseEnum() ?: ""
-
-@OptIn(InternalAPI::class)
-private fun StringValuesBuilder.appendIterableValue(name: String, value: Any) = when {
-    value.javaClass.isArray -> {
-        mutableListOf<String>().apply {
-            for (i in 0 until ArrayUtils.getLength(value)) {
-                //platform type
-                @Suppress("USELESS_CAST")
-                add((ArrayUtils.get(value, i) as Any?).parseEnum())
-            }
-        }
-    }
-    value is Iterable<*> -> value.map { it.parseEnum() }
-    else -> listOf(value.parseEnum())
-}.let {
-    if (it.isNotEmpty()) {
-        appendAll(name, it)
-    }
-}
-
-@OptIn(InternalAPI::class)
-private fun StringValuesBuilder.appendMap(value: Any) {
-    (value as Map<*, *>).forEach { (key, value) ->
-        if (key != null && value != null) {
-            append(key.toString(), value.toString())
-        }
-    }
 }

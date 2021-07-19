@@ -9,15 +9,10 @@ import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import com.hiczp.caeruleum.create
-import io.ktor.client.*
-import io.ktor.client.engine.mock.*
 import io.ktor.client.features.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.logging.*
 import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -176,6 +171,9 @@ interface Service {
 
     @Post
     suspend fun returnWithHttpResponse(@Body body: String = "HelloWorld"): HttpResponse
+
+    @Post
+    suspend fun returnWithHttpStatement(@Body body: JsonObject): HttpStatement
 }
 
 interface NoBaseUrl {
@@ -190,6 +188,16 @@ interface NoBaseUrl {
 
     @Get(LOCALHOST + "path")
     suspend fun urlInGet(): JsonElement
+
+    companion object {
+        const val baseUrl = "https://test.com/"
+    }
+}
+
+@BaseUrl(LOCALHOST)
+interface ProgrammaticBaseUrl {
+    @Get
+    suspend fun get(): JsonElement
 }
 
 enum class TestEnum {
@@ -198,34 +206,6 @@ enum class TestEnum {
 
     @EncodeName("long")
     SORT
-}
-
-@OptIn(KtorExperimentalAPI::class)
-fun createHttpClient() = HttpClient(MockEngine) {
-    engine {
-        addHandler {
-            when (it.url.encodedPath) {
-                "/notFound" -> respondError(HttpStatusCode.NotFound)
-                else -> respond(
-                    ByteReadChannel(
-                        jsonObject(
-                            "header" to it.headers.toString(),
-                            "method" to it.method.value,
-                            "url" to it.url.toString(),
-                            "contentLength" to it.body.contentLength,
-                            "body" to it.body.toByteReadPacket().readText()
-                        ).toString()
-                    ),
-                    headers = headersOf("Content-Type", ContentType.Application.Json.toString())
-                )
-            }
-        }
-    }
-
-    install(JsonFeature)
-    install(Logging) {
-        level = LogLevel.ALL
-    }
 }
 
 @TestMethodOrder(NatureOrder::class)
@@ -504,10 +484,10 @@ class Test {
 
     @Test
     fun dynamicBaseUrl() {
-        val dynamicBaseUrl = httpClient.create<NoBaseUrl>(LOCALHOST)
+        val dynamicBaseUrl = httpClient.create<NoBaseUrl>(NoBaseUrl.baseUrl)
         runBlocking {
             dynamicBaseUrl.get().url.assert {
-                LOCALHOST
+                NoBaseUrl.baseUrl
             }
         }
     }
@@ -516,8 +496,8 @@ class Test {
     fun dynamicUrl() {
         val dynamicUrl = httpClient.create<NoBaseUrl>()
         runBlocking {
-            dynamicUrl.dynamic().url.assert {
-                LOCALHOST
+            dynamicUrl.dynamic(NoBaseUrl.baseUrl).url.assert {
+                NoBaseUrl.baseUrl
             }
         }
     }
@@ -601,6 +581,27 @@ class Test {
                 Gson().fromJson<JsonObject>(it)
             }.body.assert {
                 "\"HelloWorld\""
+            }
+        }
+    }
+
+    @Test
+    fun returnWithHttpStatement() {
+        val jsonObject = jsonObject("key" to "value")
+        runBlocking {
+            service.returnWithHttpStatement(jsonObject).receive<JsonObject>().body.assert { jsonObject.toString() }
+        }
+    }
+
+    @Test
+    fun programmaticBaseUrl() {
+        runBlocking {
+            createHttpClient().use {
+                it.create<ProgrammaticBaseUrl>().get().url.assert { LOCALHOST }
+            }
+            val baseUrl = "https://test.com/"
+            createHttpClient().use {
+                it.create<ProgrammaticBaseUrl>(baseUrl).get().url.assert { baseUrl }
             }
         }
     }

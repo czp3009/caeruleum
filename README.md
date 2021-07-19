@@ -82,15 +82,11 @@ Of course.
 suspend fun multiAnnotation(@Query @Field arg: String)
 ```
 
-And also like this:
+## Can i use one Kotlin argument for multi http queryParams or formFields?
 ```kotlin
 @Post
 @FormUrlEncoded
-suspend fun containerAnnotation(
-    @Queries(Query("arg1"), Query("arg2"))
-    @Fields(Field("field1"), Field("field2"))
-    arg: String
-)
+suspend fun multiAnnotation(@Query("arg1", "arg2") @Field("field1", "field2") arg: String)
 ```
 
 ## How to skip body Serializers?
