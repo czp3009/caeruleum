@@ -1,6 +1,7 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
+import io.ktor.client.request.*
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
@@ -10,7 +11,8 @@ import kotlin.reflect.full.allSuperclasses
 @Suppress("MemberVisibilityCanBePrivate")
 class Caeruleum(
     val httpClient: HttpClient = HttpClient(),
-    val baseUrl: String? = null
+    val baseUrl: String? = null,
+    val useCache: Boolean = true
 ) {
     private val cachedServiceFunctions = ConcurrentHashMap<Method, ServiceFunction>()
 
@@ -28,22 +30,29 @@ class Caeruleum(
             "Type parameters are unsupported on ${superInterfaceWithTypeParameters!!.qualifiedName} which is an interface of ${serviceInterfaceKClass.qualifiedName}"
         }
 
-        @Suppress("UNCHECKED_CAST")
-        return Proxy.newProxyInstance(
-            serviceInterfaceJClass.classLoader,
-            arrayOf(serviceInterfaceJClass)
-        ) { proxy, method, args: Array<Any?>? ->
-            val serviceFunction = cachedServiceFunctions[method] ?: run {
-                synchronized(cachedServiceFunctions) {
-                    //prevent parse more than once
-                    cachedServiceFunctions[method] ?: run {
-                        parseServiceFunction(serviceInterfaceKClass, method, httpClient, baseUrl).also {
-                            cachedServiceFunctions[method] = it
+        fun Method.parse() = parseServiceFunction(serviceInterfaceKClass, this, httpClient, baseUrl)
+
+        val resolveServiceFunction: (Method) -> ServiceFunction = if (useCache) {
+            { method ->
+                cachedServiceFunctions[method] ?: run {
+                    synchronized(cachedServiceFunctions) {
+                        //prevent parse more than once
+                        cachedServiceFunctions[method] ?: run {
+                            method.parse().also { cachedServiceFunctions[method] = it }
                         }
                     }
                 }
             }
-            serviceFunction(proxy, method, args)
+        } else {
+            { method -> method.parse() }
+        }
+        HttpRequestBuilder
+        @Suppress("UNCHECKED_CAST")
+        return Proxy.newProxyInstance(
+            serviceInterfaceJClass.classLoader,
+            arrayOf(serviceInterfaceJClass)
+        ) { proxy, method, args ->
+            resolveServiceFunction(method)(proxy, method, args)
         } as T
     }
 }

@@ -68,6 +68,8 @@ internal data class HttpServiceFunctionParseResult(
                 url.takeFrom(realBaseUrl).apply(functionLevelPathAction)
             } else {
                 //no programmatically baseUrl and @BaseUrl
+                //try to use function level path as full url
+                //if function level not legal, hope for there an method argument with annotation @Url
                 functionLevelPathAsUrlBuilder?.let { url.takeFrom(it) }
             }
             //execute actions

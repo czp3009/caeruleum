@@ -6,6 +6,7 @@ import com.hiczp.caeruleum.annotation.Url
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.util.*
@@ -48,9 +49,17 @@ internal fun parseServiceFunction(
         //http service function
         else -> parseHttpServiceFunction(kClass, kFunction).let {
             when {
+                //no need do request
+                it.realReturnTypeInfo.type in arrayOf(
+                    HttpRequestBuilder::class,
+                    HttpRequestData::class,
+                    HttpStatement::class
+                ) -> HttpServiceFunction.NoRealRequest(it, httpClient, baseUrl)
+                //need send request
                 it.isBlocking -> HttpServiceFunction.Blocking(it, httpClient, baseUrl)
                 it.isSuspend && !it.returnTypeIsJob -> HttpServiceFunction.Suspend(it, httpClient, baseUrl)
                 !it.isSuspend && it.returnTypeIsJob -> HttpServiceFunction.Job(it, httpClient, baseUrl)
+                //both suspend and job return value
                 else -> HttpServiceFunction.SuspendAndJob(it, httpClient, baseUrl)
             }
         }
