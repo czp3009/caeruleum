@@ -4,8 +4,6 @@ import io.ktor.client.*
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.find
-import kotlin.collections.isNotEmpty
 import kotlin.collections.set
 import kotlin.reflect.KClass
 import kotlin.reflect.full.allSuperclasses
@@ -56,7 +54,13 @@ class Caeruleum(
             resolveServiceFunction(method)(proxy, method, args)
         } as T
     }
+
+    inline fun <reified T : Any> create() = create(T::class)
 }
 
+@Deprecated(
+    message = "Instantiate Caeruleum to share HttpClient between multi service interfaces",
+    replaceWith = ReplaceWith("Caeruleum(this, baseUrl).create<T>()")
+)
 inline fun <reified T : Any> HttpClient.create(baseUrl: String? = null) =
-    Caeruleum(this, baseUrl).create(T::class)
+    Caeruleum(this, baseUrl).create<T>()
