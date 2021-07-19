@@ -43,8 +43,7 @@ internal sealed class ObjectDeclaredServiceFunction(protected val serviceInterfa
 
     internal class HashCode(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.hashCode())
 
-    internal class ToString(serviceInterface: Class<*>) :
-        ConstantServiceFunction("Service interface ${serviceInterface.name}")
+    internal class ToString(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.name)
 }
 
 internal sealed interface NonAbstractServiceFunction : ServiceFunction {
@@ -82,13 +81,17 @@ internal sealed class HttpServiceFunction(
 ) : ServiceFunction {
     private val httpStatementExecutor: suspend (HttpStatement) -> Any =
         when (httpServiceFunctionParseResult.realReturnTypeInfo.type) {
+            //TODO return HttpStatement don't need suspend, and return value may be HttpRequestBuilder
             HttpStatement::class -> { it -> it }
             HttpResponse::class -> { it -> it.execute() }
             else -> { it -> it.execute { it.call.receive(httpServiceFunctionParseResult.realReturnTypeInfo) } }
         }
 
+    private fun generateHttpRequestBuilder(args: Array<out Any?>?) =
+        httpServiceFunctionParseResult.generateHttpRequestBuilder(baseUrl, args.orEmpty())
+
     private fun generateHttpStatement(args: Array<out Any?>?) =
-        HttpStatement(httpServiceFunctionParseResult.generateHttpRequestBuilder(baseUrl, args.orEmpty()), httpClient)
+        HttpStatement(generateHttpRequestBuilder(args), httpClient)
 
     protected suspend inline fun execute(args: Array<out Any?>?) = httpStatementExecutor(generateHttpStatement(args))
 
