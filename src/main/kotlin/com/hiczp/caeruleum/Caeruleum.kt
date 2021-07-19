@@ -1,10 +1,12 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
-import io.ktor.client.request.*
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.find
+import kotlin.collections.isNotEmpty
+import kotlin.collections.set
 import kotlin.reflect.KClass
 import kotlin.reflect.full.allSuperclasses
 
@@ -46,7 +48,6 @@ class Caeruleum(
         } else {
             { method -> method.parse() }
         }
-        HttpRequestBuilder
         @Suppress("UNCHECKED_CAST")
         return Proxy.newProxyInstance(
             serviceInterfaceJClass.classLoader,

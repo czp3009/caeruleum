@@ -40,7 +40,7 @@ internal sealed class ObjectDeclaredServiceFunction(protected val serviceInterfa
         }
     }
 
-    internal class HashCode(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.hashCode())
+    internal class HashCode(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.name.hashCode())
 
     internal class ToString(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.name)
 }
