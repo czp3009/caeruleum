@@ -10,6 +10,7 @@ import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import com.hiczp.caeruleum.create
+import com.hiczp.caeruleum.test.mock.createHttpClient
 import io.ktor.client.features.*
 import io.ktor.client.statement.*
 import io.ktor.content.*
@@ -20,7 +21,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
-import org.junit.jupiter.api.Test
 
 const val LOCALHOST = "https://localhost/"
 
