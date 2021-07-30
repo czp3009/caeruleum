@@ -49,7 +49,7 @@ internal fun parseServiceFunction(
         //http service function
         else -> parseHttpServiceFunction(kClass, kFunction).let {
             when {
-                //no need do request
+                //no need send real request
                 it.realReturnTypeInfo.type in arrayOf(
                     HttpRequestBuilder::class,
                     HttpRequestData::class,

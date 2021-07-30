@@ -1,6 +1,7 @@
 package com.hiczp.caeruleum.test.mock
 
 import com.github.salomonbrys.kotson.jsonObject
+import com.hiczp.caeruleum.Caeruleum
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.features.json.*
@@ -12,25 +13,27 @@ fun createHttpClient() = HttpClient(MockEngine) {
     engine {
         addHandler {
             when (it.url.encodedPath) {
-                "/echo" -> respond(
+                "echo" -> respond(
                     content = it.body.toByteArray(),
                     headers = it.body.contentType?.let { contentType ->
                         headersOf(HttpHeaders.ContentType, contentType.toString())
                     } ?: Headers.Empty
                 )
-                "/returnEncodedPath" -> respondOk(it.url.encodedPath)
-                "/returnUrl" -> respondOk(it.url.toString())
-                "/returnHeadersAsString" -> respondOk(it.headers.toString())
-                "/returnMethod" -> respondOk(it.method.value)
-                "/returnQueryParametersAsString" -> respondOk(it.url.parameters.toString())
+                "returnEncodedPath" -> respondOk(it.url.encodedPath)
+                "returnUrl" -> respondOk(it.url.toString())
+                "returnHost" -> respondOk(it.url.host)
+                "returnPort" -> respondOk(it.url.port.toString())
+                "returnHeadersAsString" -> respondOk(it.headers.toString())
+                "returnMethod" -> respondOk(it.method.value)
+                "returnQueryParametersAsString" -> respondOk(it.url.parameters.toString())
 
                 //error response
-                "/ok" -> respondOk()
-                "/redirect" -> respondRedirect("/redirected")
-                "/redirected" -> respondOk("redirected")
-                "/badRequest" -> respondBadRequest()
-                "/notFound" -> respondError(HttpStatusCode.NotFound)
-                "/internalError" -> respondError(HttpStatusCode.InternalServerError)
+                "ok" -> respondOk()
+                "redirect" -> respondRedirect("/redirected")
+                "redirected" -> respondOk("redirected")
+                "badRequest" -> respondBadRequest()
+                "notFound" -> respondError(HttpStatusCode.NotFound)
+                "internalError" -> respondError(HttpStatusCode.InternalServerError)
 
                 //other request
                 else -> respond(
@@ -56,3 +59,6 @@ fun createHttpClient() = HttpClient(MockEngine) {
 }
 
 val mockHttpClient = createHttpClient()
+val mockCaeruleum = Caeruleum(httpClient = mockHttpClient)
+
+inline fun <reified T : Any> createMockService() = mockCaeruleum.create<T>()
