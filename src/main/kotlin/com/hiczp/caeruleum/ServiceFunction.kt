@@ -100,7 +100,7 @@ internal sealed class HttpServiceFunction(
     ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
         private val argumentProcessor: (args: Array<out Any?>) -> Array<out Any?> =
             if (parseResult.isSuspend) {
-                { args -> args.parseSuspendFunArgs().first }
+                { args -> args.copyOfRange(0, args.size - 1) }
             } else {
                 { args -> args }
             }
@@ -177,7 +177,8 @@ internal sealed class HttpServiceFunction(
     }
 
     protected companion object {
-        protected fun Array<out Any?>.parseSuspendFunArgs() =
+        @Suppress("NOTHING_TO_INLINE")
+        protected inline fun Array<out Any?>.parseSuspendFunArgs() =
             copyOfRange(0, size - 1) to get(size - 1) as Continuation<Any>
     }
 }
