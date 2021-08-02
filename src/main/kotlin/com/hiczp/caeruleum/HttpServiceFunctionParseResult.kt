@@ -27,7 +27,7 @@ internal data class HttpServiceFunctionParseResult(
     } else {
         { encodedPath += functionLevelPath }
     }
-    private val functionLevelPathAsUrlBuilder by lazy(LazyThreadSafetyMode.NONE) {
+    private val functionLevelPathAsUrlBuilder by lazy {
         runCatching { URLBuilder(functionLevelPath) }.getOrNull()
     }
     private val preAction: HttpRequestBuilder.() -> Unit
@@ -69,7 +69,7 @@ internal data class HttpServiceFunctionParseResult(
             } else {
                 //no programmatically baseUrl and @BaseUrl
                 //try to use function level path as full url
-                //if function level not legal, hope for there an method argument with annotation @Url
+                //if function level not legal, hope for there a method argument with annotation @Url
                 functionLevelPathAsUrlBuilder?.let { url.takeFrom(it) }
             }
             //execute actions
