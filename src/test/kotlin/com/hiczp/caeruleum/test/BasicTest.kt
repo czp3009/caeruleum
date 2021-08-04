@@ -1,9 +1,6 @@
 package com.hiczp.caeruleum.test
 
-import com.hiczp.caeruleum.annotation.Body
-import com.hiczp.caeruleum.annotation.DefaultContentType
-import com.hiczp.caeruleum.annotation.Get
-import com.hiczp.caeruleum.annotation.Post
+import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.test.mock.createMockService
 import io.ktor.client.statement.*
 import io.ktor.content.*
@@ -16,6 +13,7 @@ private data class Request(val data: String)
 private data class Response(val data: String)
 
 @DefaultContentType("application/json")
+@BaseUrl("https://localhost")
 private interface Service {
     @Get("ok")
     suspend fun ok(): HttpResponse

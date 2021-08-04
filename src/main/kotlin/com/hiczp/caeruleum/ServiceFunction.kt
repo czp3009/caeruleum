@@ -3,7 +3,6 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.*
 import java.lang.invoke.MethodHandles
@@ -13,9 +12,7 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.reflect.full.isSuperclassOf
 
-internal sealed interface ServiceFunction : InvocationHandler {
-    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any
-}
+internal sealed interface ServiceFunction : InvocationHandler
 
 internal object DoNothingServiceFunction : ServiceFunction {
     override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any = Unit
@@ -76,11 +73,10 @@ internal sealed interface NonAbstractServiceFunction : ServiceFunction {
 @Suppress("MemberVisibilityCanBePrivate")
 internal sealed class HttpServiceFunction(
     protected val parseResult: HttpServiceFunctionParseResult,
-    protected val httpClient: HttpClient,
-    protected val baseUrl: String?
+    protected val httpClient: HttpClient
 ) : ServiceFunction {
     protected fun generateHttpRequestBuilder(args: Array<out Any?>) =
-        parseResult.generateHttpRequestBuilder(baseUrl, args)
+        parseResult.generateHttpRequestBuilder(args)
 
     protected fun generateHttpStatement(args: Array<out Any?>) =
         HttpStatement(generateHttpRequestBuilder(args), httpClient)
@@ -93,24 +89,17 @@ internal sealed class HttpServiceFunction(
         }
 
     //no need to send real request when return value is HttpRequestBuilder, HttpRequestData, HttpStatement
-    internal class NoRealRequest(
+    internal sealed class NoRealRequest(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient,
-        baseUrl: String?
-    ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
+        httpClient: HttpClient
+    ) : HttpServiceFunction(parseResult, httpClient) {
         private val argumentProcessor: (args: Array<out Any?>) -> Array<out Any?> =
             if (parseResult.isSuspend) {
                 { args -> args.copyOfRange(0, args.size - 1) }
             } else {
                 { args -> args }
             }
-        private val responseGenerator: (args: Array<out Any?>) -> Any =
-            when (parseResult.realReturnTypeInfo.type) {
-                HttpRequestBuilder::class -> { args -> generateHttpRequestBuilder(args) }
-                HttpRequestData::class -> { args -> generateHttpRequestBuilder(args).build() }
-                //HttpStatement
-                else -> { args -> generateHttpStatement(args) }
-            }
+        abstract val responseGenerator: (args: Array<out Any?>) -> Any
         private val returnValueWrapper: (value: Any) -> Any =
             if (parseResult.returnTypeIsJob) {
                 { value -> CompletableDeferred(value) }
@@ -121,13 +110,36 @@ internal sealed class HttpServiceFunction(
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
             return argumentProcessor(args.orEmpty()).let(responseGenerator).let(returnValueWrapper)
         }
+
+        internal class HttpRequestBuilder(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpRequestBuilder(args) }
+        }
+
+        internal class HttpRequestData(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpRequestBuilder(args).build() }
+        }
+
+        internal class HttpStatement(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpStatement(args) }
+        }
     }
 
     internal class Blocking(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient,
-        baseUrl: String?
-    ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
+        httpClient: HttpClient
+    ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?) = runBlocking {
@@ -137,9 +149,8 @@ internal sealed class HttpServiceFunction(
 
     internal class Suspend(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient,
-        baseUrl: String?
-    ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
+        httpClient: HttpClient
+    ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
@@ -153,9 +164,8 @@ internal sealed class HttpServiceFunction(
 
     internal class Job(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient,
-        baseUrl: String?
-    ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
+        httpClient: HttpClient
+    ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
@@ -165,9 +175,8 @@ internal sealed class HttpServiceFunction(
 
     internal class SuspendAndJob(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient,
-        baseUrl: String?
-    ) : HttpServiceFunction(parseResult, httpClient, baseUrl) {
+        httpClient: HttpClient
+    ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {

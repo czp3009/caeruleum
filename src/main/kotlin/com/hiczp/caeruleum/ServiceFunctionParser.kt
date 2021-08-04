@@ -47,26 +47,31 @@ internal fun parseServiceFunction(
         //non-abstract kotlin function
         !kFunction.isAbstract -> NonAbstractServiceFunction.KotlinDefaultImpls(jClass, method)
         //http service function
-        else -> parseHttpServiceFunction(kClass, kFunction).let {
+        else -> parseHttpServiceFunction(kClass, kFunction, baseUrl).let {
             when {
                 //no need send real request
-                it.realReturnTypeInfo.type in arrayOf(
-                    HttpRequestBuilder::class,
-                    HttpRequestData::class,
-                    HttpStatement::class
-                ) -> HttpServiceFunction.NoRealRequest(it, httpClient, baseUrl)
+                it.realReturnTypeInfo.type.isSuperclassOf(HttpRequestBuilder::class) ->
+                    HttpServiceFunction.NoRealRequest.HttpRequestBuilder(it, httpClient)
+                it.realReturnTypeInfo.type.isSuperclassOf(HttpRequestData::class) ->
+                    HttpServiceFunction.NoRealRequest.HttpRequestData(it, httpClient)
+                it.realReturnTypeInfo.type.isSuperclassOf(HttpStatement::class) ->
+                    HttpServiceFunction.NoRealRequest.HttpStatement(it, httpClient)
                 //need send request
-                it.isBlocking -> HttpServiceFunction.Blocking(it, httpClient, baseUrl)
-                it.isSuspend && !it.returnTypeIsJob -> HttpServiceFunction.Suspend(it, httpClient, baseUrl)
-                !it.isSuspend && it.returnTypeIsJob -> HttpServiceFunction.Job(it, httpClient, baseUrl)
+                it.isBlocking -> HttpServiceFunction.Blocking(it, httpClient)
+                it.isSuspend && !it.returnTypeIsJob -> HttpServiceFunction.Suspend(it, httpClient)
+                !it.isSuspend && it.returnTypeIsJob -> HttpServiceFunction.Job(it, httpClient)
                 //both suspend and job return value
-                else -> HttpServiceFunction.SuspendAndJob(it, httpClient, baseUrl)
+                else -> HttpServiceFunction.SuspendAndJob(it, httpClient)
             }
         }
     }
 }
 
-internal fun parseHttpServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>): HttpServiceFunctionParseResult {
+internal fun parseHttpServiceFunction(
+    kClass: KClass<*>,
+    kFunction: KFunction<*>,
+    baseUrl: String?
+): HttpServiceFunctionParseResult {
     val isSuspend = kFunction.isSuspend
     val returnTypeIsJob = kFunction.returnType.isSubtypeOf(jobType)
     val realReturnTypeInfo = with(kFunction.returnType) {
@@ -274,16 +279,17 @@ internal fun parseHttpServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>
     val classLevelBaseUrl = kClass.findAnnotation<BaseUrl>()?.value
 
     return HttpServiceFunctionParseResult(
-        isSuspend,
-        returnTypeIsJob,
-        realReturnTypeInfo,
-        actions,
-        classLevelBaseUrl,
-        functionLevelAttributes,
-        functionLevelHeaders,
-        functionLevelPath,
-        httpMethod!!,
-        isFormUrlEncoded,
-        isMultipart
+        isSuspend = isSuspend,
+        returnTypeIsJob = returnTypeIsJob,
+        realReturnTypeInfo = realReturnTypeInfo,
+        actions = actions,
+        classLevelBaseUrl = classLevelBaseUrl,
+        functionLevelAttributes = functionLevelAttributes,
+        functionLevelHeaders = functionLevelHeaders,
+        functionLevelPath = functionLevelPath,
+        httpMethod = httpMethod!!,
+        isFormUrlEncoded = isFormUrlEncoded,
+        isMultipart = isMultipart,
+        programmaticallyBaseUrl = baseUrl
     )
 }

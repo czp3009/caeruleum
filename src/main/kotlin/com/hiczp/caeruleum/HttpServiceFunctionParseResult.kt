@@ -18,22 +18,35 @@ internal data class HttpServiceFunctionParseResult(
     val functionLevelPath: String,
     val httpMethod: HttpMethod,
     val isFormUrlEncoded: Boolean,
-    val isMultipart: Boolean
+    val isMultipart: Boolean,
+    val programmaticallyBaseUrl: String?
 ) {
     val isBlocking = !isSuspend && !returnTypeIsJob
     val functionLevelPathIsAbsolute = functionLevelPath.startsWith('/')
-    private val functionLevelPathAction: URLBuilder.() -> Unit = if (functionLevelPathIsAbsolute) {
-        { encodedPath = functionLevelPath }
-    } else {
-        { encodedPath += functionLevelPath }
-    }
-    private val functionLevelPathAsUrlBuilder by lazy {
-        runCatching { URLBuilder(functionLevelPath) }.getOrNull()
-    }
+    private val baseUrlAction: URLBuilder.() -> Unit
     private val preAction: HttpRequestBuilder.() -> Unit
     private val postAction: HttpRequestBuilder.() -> Unit
 
     init {
+        //baseUrl
+        //set baseUrl before execute actions, so that @Url can override it
+        //programmatically baseUrl > @BaseUrl
+        //if no url set, ktor will use localhost as host
+        val baseUrl = programmaticallyBaseUrl ?: classLevelBaseUrl
+        baseUrlAction = if (baseUrl != null) {
+            val functionLevelPathAction: URLBuilder.() -> Unit = if (functionLevelPathIsAbsolute) {
+                { encodedPath = functionLevelPath }
+            } else {
+                { encodedPath += functionLevelPath }
+            }
+            { takeFrom(baseUrl).apply(functionLevelPathAction) }
+        } else {
+            //no programmatically baseUrl and @BaseUrl
+            //try to use function level path as full url
+            //if function level not legal, hope for there a method argument with annotation @Url
+            runCatching { URLBuilder(functionLevelPath) }.getOrNull()?.let { { takeFrom(it) } } ?: {}
+        }
+        //preAction and postAction
         when {
             isFormUrlEncoded -> {
                 preAction = { body = ParametersBuilder() }
@@ -51,7 +64,7 @@ internal data class HttpServiceFunctionParseResult(
         }
     }
 
-    fun generateHttpRequestBuilder(baseUrl: String? = null, args: Array<out Any?>) =
+    fun generateHttpRequestBuilder(args: Array<out Any?>) =
         HttpRequestBuilder().apply {
             //init
             functionLevelAttributes.allKeys.forEach {
@@ -60,19 +73,8 @@ internal data class HttpServiceFunctionParseResult(
             }
             headers.appendAll(functionLevelHeaders)
             method = httpMethod
-            //set baseUrl before execute actions, so that @Url can override it
-            //programmatically baseUrl > @BaseUrl
-            //if no url set, ktor will use localhost as host
-            val realBaseUrl = (baseUrl ?: classLevelBaseUrl)
-            if (realBaseUrl != null) {
-                url.takeFrom(realBaseUrl).apply(functionLevelPathAction)
-            } else {
-                //no programmatically baseUrl and @BaseUrl
-                //try to use function level path as full url
-                //if function level not legal, hope for there a method argument with annotation @Url
-                functionLevelPathAsUrlBuilder?.let { url.takeFrom(it) }
-            }
             //execute actions
+            url.apply(baseUrlAction)
             preAction()
             args.forEachIndexed { index, arg ->
                 if (arg != null) {
