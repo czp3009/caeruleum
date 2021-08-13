@@ -4,19 +4,37 @@ import io.ktor.client.*
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.set
 import kotlin.reflect.KClass
 import kotlin.reflect.full.allSuperclasses
 
-@Suppress("MemberVisibilityCanBePrivate")
-class Caeruleum(
-    val httpClient: HttpClient = HttpClient(),
-    val baseUrl: String? = null,
-    val useCache: Boolean = true
-) {
-    private val cachedServiceFunctions = ConcurrentHashMap<Method, ServiceFunction>()
+/**
+ * Share Caeruleum instance between multi HttpClients to make full use of ServiceFunction cache
+ * @param useCache save resolved ServiceFunction and reuse it, default is true
+ */
+class Caeruleum(useCache: Boolean = true) {
+    private val resolveServiceFunction: (method: Method, parse: (method: Method) -> ServiceFunction) -> ServiceFunction
 
-    fun <T : Any> create(serviceInterfaceKClass: KClass<T>): T {
+    init {
+        resolveServiceFunction = if (useCache) {
+            val cachedServiceFunctions = ConcurrentHashMap<Method, ServiceFunction>()
+            ({ method, parse -> cachedServiceFunctions.computeIfAbsent(method) { parse(it) } })
+        } else {
+            { method, parse -> parse(method) }
+        }
+    }
+
+    /**
+     * Create ServiceInterface implementation
+     * @param serviceInterfaceKClass ServiceInterface
+     * @param httpClient the HttpClient which HttpStatement bind to
+     * @param baseUrl Programmatically baseUrl, if not null this value override class level @BaseUrl
+     * @throws IllegalArgumentException If ServiceInterface is not interface or has type parameters
+     */
+    fun <T : Any> create(
+        serviceInterfaceKClass: KClass<T>,
+        httpClient: HttpClient,
+        baseUrl: String? = null
+    ): T {
         val serviceInterfaceJClass = serviceInterfaceKClass.java
         //check if interface
         require(serviceInterfaceJClass.isInterface) { "API declarations must be interfaces" }
@@ -30,37 +48,31 @@ class Caeruleum(
             "Type parameters are unsupported on ${superInterfaceWithTypeParameters!!.qualifiedName} which is an interface of ${serviceInterfaceKClass.qualifiedName}"
         }
 
-        fun Method.parse() = parseServiceFunction(serviceInterfaceKClass, this, httpClient, baseUrl)
-
-        val resolveServiceFunction: (Method) -> ServiceFunction = if (useCache) {
-            { method ->
-                cachedServiceFunctions[method] ?: run {
-                    synchronized(cachedServiceFunctions) {
-                        //prevent parse more than once
-                        cachedServiceFunctions[method] ?: run {
-                            method.parse().also { cachedServiceFunctions[method] = it }
-                        }
-                    }
-                }
-            }
-        } else {
-            { method -> method.parse() }
-        }
         @Suppress("UNCHECKED_CAST")
         return Proxy.newProxyInstance(
             serviceInterfaceJClass.classLoader,
             arrayOf(serviceInterfaceJClass)
         ) { proxy, method, args ->
-            resolveServiceFunction(method)(proxy, method, args)
+            resolveServiceFunction(method) {
+                parseServiceFunction(
+                    kClass = serviceInterfaceKClass,
+                    method = it,
+                    httpClient = httpClient,
+                    baseUrl = baseUrl
+                )
+            }(proxy, method, args)
         } as T
     }
 
-    inline fun <reified T : Any> create() = create(T::class)
+    inline fun <reified T : Any> create(
+        httpClient: HttpClient,
+        baseUrl: String? = null
+    ) = create(T::class, httpClient, baseUrl)
 }
 
 @Deprecated(
     message = "Instantiate Caeruleum to share HttpClient between multi service interfaces",
-    replaceWith = ReplaceWith("Caeruleum(this, baseUrl).create<T>()")
+    replaceWith = ReplaceWith("Caeruleum().create<T>(this, baseUrl)")
 )
 inline fun <reified T : Any> HttpClient.create(baseUrl: String? = null) =
-    Caeruleum(this, baseUrl).create<T>()
+    Caeruleum().create<T>(this, baseUrl)

@@ -29,7 +29,7 @@ fun main() {
         }
     }
     //get implement of interface
-    val githubService = Caeruleum(httpClient).create<GitHubService>()
+    val githubService = Caeruleum().create<GitHubService>(httpClient)
     runBlocking {
         //send http request
         githubService.listRepos("czp3009").run(::println)

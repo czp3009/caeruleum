@@ -60,6 +60,6 @@ fun createMockHttpClient() = HttpClient(MockEngine) {
 }
 
 val mockHttpClient = createMockHttpClient()
-val mockCaeruleum = Caeruleum(httpClient = mockHttpClient)
+val mockCaeruleum = Caeruleum()
 
-inline fun <reified T : Any> createMockService() = mockCaeruleum.create<T>()
+inline fun <reified T : Any> createMockService() = mockCaeruleum.create<T>(mockHttpClient)
