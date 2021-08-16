@@ -1,6 +1,7 @@
 package com.hiczp.caeruleum
 
 import com.hiczp.caeruleum.annotation.*
+import com.hiczp.caeruleum.annotation.Attributes
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import io.ktor.client.*
@@ -87,7 +88,7 @@ internal fun parseHttpServiceFunction(
     }
 
     //parse function
-    val functionLevelAttributes = Attributes(concurrent = false)
+    val functionLevelAttributes = HashMap<String, String>()
     val functionLevelHeaders = HeadersBuilder()
     var functionLevelPath = ""
     var httpMethod: HttpMethod? = null
@@ -127,7 +128,8 @@ internal fun parseHttpServiceFunction(
                 check(!isFormUrlEncoded) { "Only one encoding annotation is allowed" }
                 isMultipart = true
             }
-            is Attribute -> functionLevelAttributes.put(AttributeKey(it.key), it.value)
+            is Attribute -> functionLevelAttributes[it.key] = it.value
+            is Attributes -> it.value.forEach { attribute -> functionLevelAttributes[attribute.key] = attribute.value }
         }
     }
     checkNotNull(httpMethod) { "HTTP method annotation is required" }
@@ -284,7 +286,7 @@ internal fun parseHttpServiceFunction(
         realReturnTypeInfo = realReturnTypeInfo,
         actions = actions,
         classLevelBaseUrl = classLevelBaseUrl,
-        functionLevelAttributes = functionLevelAttributes,
+        functionLevelAttributes = functionLevelAttributes.map { AttributeKey<String>(it.key) to it.value },
         functionLevelHeaders = functionLevelHeaders,
         functionLevelPath = functionLevelPath,
         httpMethod = httpMethod!!,

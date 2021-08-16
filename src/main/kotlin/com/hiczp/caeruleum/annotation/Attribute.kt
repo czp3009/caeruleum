@@ -6,3 +6,9 @@ import kotlin.annotation.AnnotationTarget.FUNCTION
 @Target(FUNCTION)
 @Repeatable
 annotation class Attribute(val key: String, val value: String = "")
+
+//container of Attribute
+@MustBeDocumented
+@Target(FUNCTION)
+@Repeatable
+annotation class Attributes(vararg val value: Attribute)

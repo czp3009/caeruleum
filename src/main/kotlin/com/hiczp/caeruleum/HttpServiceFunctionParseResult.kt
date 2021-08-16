@@ -13,7 +13,7 @@ internal data class HttpServiceFunctionParseResult(
     val realReturnTypeInfo: TypeInfo,
     val actions: Array<out List<HttpRequestBuilder.(value: Any) -> Unit>>,
     val classLevelBaseUrl: String?,
-    val functionLevelAttributes: Attributes,
+    val functionLevelAttributes: Iterable<Pair<AttributeKey<String>, String>>,
     val functionLevelHeaders: HeadersBuilder,
     val functionLevelPath: String,
     val httpMethod: HttpMethod,
@@ -67,9 +67,8 @@ internal data class HttpServiceFunctionParseResult(
     fun generateHttpRequestBuilder(args: Array<out Any?>) =
         HttpRequestBuilder().apply {
             //init
-            functionLevelAttributes.allKeys.forEach {
-                @Suppress("UNCHECKED_CAST")
-                this.attributes.put(it as AttributeKey<Any>, attributes[it])
+            functionLevelAttributes.forEach { (key, value) ->
+                attributes.put(key, value)
             }
             headers.appendAll(functionLevelHeaders)
             method = httpMethod
