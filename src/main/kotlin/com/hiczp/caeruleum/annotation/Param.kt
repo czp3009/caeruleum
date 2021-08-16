@@ -26,7 +26,7 @@ annotation class HeaderMap
 annotation class Query(vararg val value: String = [""])
 
 //Container of Query
-//@Deprecated("use @Query instead")
+@Deprecated("Use @Query instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Queries(vararg val value: Query)
@@ -41,7 +41,7 @@ annotation class QueryMap
 annotation class Field(vararg val value: String = [""])
 
 //Container of Field
-//@Deprecated("use @Field instead")
+@Deprecated("Use @Field instead")
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 annotation class Fields(vararg val value: Field)
