@@ -5,7 +5,7 @@ buildscript {
 
     dependencies {
         // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-gradle-plugin
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.31'
     }
 }
 
@@ -42,7 +42,7 @@ compileTestKotlin {
 }
 
 //ktor
-def ktor_version = '1.6.1'
+def ktor_version = '1.6.5'
 dependencies {
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-core
     implementation group: 'io.ktor', name: 'ktor-client-core', version: ktor_version
@@ -53,7 +53,7 @@ dependencies {
     // https://mvnrepository.com/artifact/org.testng/testng
     testImplementation group: 'org.testng', name: 'testng', version: '7.4.0'
     // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-test
-    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test', version: '1.5.21'
+    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test', version: '1.5.31'
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
     testImplementation group: 'io.ktor', name: 'ktor-client-cio', version: ktor_version
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
