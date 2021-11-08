@@ -30,22 +30,28 @@ class BasicTest {
     private val service = createMockService<Service>()
 
     @Test
-    fun ok() = runBlocking {
-        val response = service.ok()
-        assertEquals(HttpStatusCode.OK, response.status)
+    fun ok() {
+        runBlocking {
+            val response = service.ok()
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
     }
 
     @Test
-    fun echoString() = runBlocking {
-        val body = "i am body"
-        val result = service.echoString(TextContent(body, ContentType.Text.Plain))
-        assertEquals(body, result)
+    fun echoString() {
+        runBlocking {
+            val body = "i am body"
+            val result = service.echoString(TextContent(body, ContentType.Text.Plain))
+            assertEquals(body, result)
+        }
     }
 
     @Test
-    fun echoJson() = runBlocking {
-        val data = "i am data"
-        val response = service.echoJson(RequestBody(data))
-        assertEquals(data, response.data)
+    fun echoJson() {
+        runBlocking {
+            val data = "i am data"
+            val response = service.echoJson(RequestBody(data))
+            assertEquals(data, response.data)
+        }
     }
 }
