@@ -1,7 +1,6 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -79,14 +78,14 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
                     httpClient.launch {
                         runCatching {
                             HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, realArgs), httpClient)
-                                .executeAndReceive(serviceFunction.returnTypeInfo)
+                                .execute().call.body(serviceFunction.returnTypeInfo)
                         }.run(continuation::resumeWith)
                     }
                     COROUTINE_SUSPENDED
                 } else {
                     httpClient.async {
                         HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, args.orEmpty()), httpClient)
-                            .executeAndReceive(serviceFunction.returnTypeInfo)
+                            .execute().call.body(serviceFunction.returnTypeInfo)
                     }
                 }
             }
@@ -96,9 +95,3 @@ internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient,
 
 inline fun <reified T> HttpClient.create(baseUrl: String? = null) =
     dynamicProxyToHttpClient(T::class, this, baseUrl) as T
-
-private suspend inline fun HttpStatement.executeAndReceive(returnTypeInfo: TypeInfo) = when (returnTypeInfo.type) {
-    HttpStatement::class -> this
-    HttpResponse::class -> execute()
-    else -> execute { it.call.receive(returnTypeInfo) }
-}

@@ -3,14 +3,14 @@ package com.hiczp.caeruleum.test
 import com.github.salomonbrys.kotson.jsonObject
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.logging.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
-import io.ktor.util.*
+import io.ktor.serialization.gson.*
 import io.ktor.utils.io.*
 
-@OptIn(KtorExperimentalAPI::class)
 fun createHttpClient() = HttpClient(MockEngine) {
+    expectSuccess = true
     engine {
         addHandler {
             when (it.url.encodedPath) {
@@ -31,7 +31,9 @@ fun createHttpClient() = HttpClient(MockEngine) {
         }
     }
 
-    install(JsonFeature)
+    install(ContentNegotiation) {
+        gson()
+    }
     install(Logging) {
         level = LogLevel.ALL
     }

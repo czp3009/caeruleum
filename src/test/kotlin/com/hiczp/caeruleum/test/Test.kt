@@ -9,10 +9,11 @@ import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import com.hiczp.caeruleum.create
-import io.ktor.client.features.*
+import io.ktor.client.plugins.*
 import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
+import io.ktor.util.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -87,7 +88,7 @@ interface Service {
     fun fieldEncode(
         @FieldMap map: Map<String, String> = mapOf(
             "param1" to "1 2!+/"
-        )
+        ),
     ): Deferred<JsonElement>
 
     @Get
@@ -124,12 +125,12 @@ interface Service {
     suspend fun containerAnnotation(
         @Queries(Query("arg1"), Query("arg2"))
         @Fields(Field("field1"), Field("field2"))
-        arg: String = "!"
+        arg: String = "!",
     )
 
     @Post
     suspend fun postWithTextBody(
-        @Body body: TextContent = TextContent("!", ContentType.Text.Plain)
+        @Body body: TextContent = TextContent("!", ContentType.Text.Plain),
     ): JsonElement
 
     @Get
@@ -166,14 +167,11 @@ interface Service {
         @Query args: Array<TestEnum> = arrayOf(
             TestEnum.MY_NAME_VERY_LONG,
             TestEnum.SORT
-        )
+        ),
     ): JsonElement
 
     @Post
     suspend fun returnWithHttpResponse(@Body body: String = "HelloWorld"): HttpResponse
-
-    @Post
-    suspend fun returnWithHttpStatement(@Body body: JsonObject): HttpStatement
 }
 
 interface NoBaseUrl {
@@ -467,7 +465,7 @@ class Test {
         val noBaseUrl = httpClient.create<NoBaseUrl>()
         runBlocking {
             noBaseUrl.get().url.assert {
-                "http://localhost/"
+                "http://localhost"
             }
         }
     }
@@ -477,7 +475,7 @@ class Test {
         val noBaseUrl = httpClient.create<NoBaseUrl>()
         runBlocking {
             noBaseUrl.getWithParam().url.assert {
-                "http://localhost/?param1=%21"
+                "http://localhost?param1=%21"
             }
         }
     }
@@ -574,6 +572,7 @@ class Test {
         }
     }
 
+    @OptIn(InternalAPI::class)
     @Test
     fun returnWithHttpResponse() {
         runBlocking {
@@ -582,14 +581,6 @@ class Test {
             }.body.assert {
                 "\"HelloWorld\""
             }
-        }
-    }
-
-    @Test
-    fun returnWithHttpStatement() {
-        val jsonObject = jsonObject("key" to "value")
-        runBlocking {
-            service.returnWithHttpStatement(jsonObject).receive<JsonObject>().body.assert { jsonObject.toString() }
         }
     }
 

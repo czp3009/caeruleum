@@ -3,12 +3,12 @@ package com.hiczp.caeruleum
 import com.hiczp.caeruleum.annotation.*
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.util.*
+import io.ktor.util.reflect.*
 import kotlinx.coroutines.Job
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -220,7 +220,7 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
                         if (gotBody) error("Multiple @Body method annotations found")
                         gotBody = true
                         actions[index].add { value ->
-                            body = value
+                            setBody(value)
                         }
                         //Content-Type priority: OutGoingContent.contentType > @Body > @DefaultContentType
                         val contentTypeInAnnotation = (annotation.value.takeIf { it.isNotEmpty() }
@@ -254,13 +254,14 @@ internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
 
         when {
             isFormUrlEncoded -> {
-                preAction = { body = ParametersBuilder() }
-                postAction = { body = FormDataContent((body as ParametersBuilder).build()) }
+                preAction = { setBody(ParametersBuilder()) }
+                postAction = { setBody(FormDataContent((body as ParametersBuilder).build())) }
             }
             isMultipart -> {
-                preAction = { body = mutableListOf<FormPart<*>>() }
+                preAction = { setBody(mutableListOf<FormPart<*>>()) }
                 @Suppress("UNCHECKED_CAST")
-                postAction = { body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())) }
+                postAction =
+                    { setBody(MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))) }
             }
             else -> {
                 preAction = {}

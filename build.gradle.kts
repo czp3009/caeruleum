@@ -16,6 +16,10 @@ repositories {
     jcenter()
     mavenCentral()
     maven("https://dl.bintray.com/kotlin/kotlinx/")
+    maven {
+        url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap")
+        name = "ktor-eap"
+    }
 }
 
 //kotlin
@@ -34,27 +38,24 @@ tasks.withType<KotlinCompile> {
 }
 
 //ktor-client
-dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core-jvm
-    api("io.ktor:ktor-client-core-jvm:${Ktor.version}")
-}
 
 //test
 dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
-    testImplementation("io.ktor:ktor-client-cio:${Ktor.version}")
+    api("io.ktor:ktor-client-core-jvm:2.0.3")// https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
+    testImplementation("io.ktor:ktor-client-content-negotiation:${Ktor.version}")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-gson
-    testImplementation("io.ktor:ktor-client-gson:${Ktor.version}")
+    testImplementation("io.ktor:ktor-serialization-gson:${Ktor.version}")
     // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson
     testImplementation("com.github.salomonbrys.kotson:kotson:2.5.0")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging-jvm
-    testImplementation("io.ktor:ktor-client-logging-jvm:${Ktor.version}")
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
     testImplementation("org.slf4j:slf4j-simple:1.7.30")
     // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter
     testImplementation("org.junit.jupiter:junit-jupiter:5.7.0")
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock-jvm
-    testImplementation("io.ktor:ktor-client-mock-jvm:${Ktor.version}")
+    testImplementation("io.ktor:ktor-client-cio-jvm:2.0.3")
+    testImplementation("io.ktor:ktor-client-logging-jvm:2.0.3")
+    testImplementation("io.ktor:ktor-client-mock-jvm:2.0.3")
 }
 
 tasks.test {

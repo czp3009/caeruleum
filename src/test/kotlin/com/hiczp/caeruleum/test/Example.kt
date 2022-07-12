@@ -5,13 +5,11 @@ import com.hiczp.caeruleum.annotation.BaseUrl
 import com.hiczp.caeruleum.annotation.Get
 import com.hiczp.caeruleum.annotation.Path
 import com.hiczp.caeruleum.create
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.features.json.GsonSerializer
-import io.ktor.client.features.json.JsonFeature
-import io.ktor.client.features.logging.LogLevel
-import io.ktor.client.features.logging.Logging
-import io.ktor.util.KtorExperimentalAPI
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.serialization.gson.*
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 
@@ -24,10 +22,9 @@ interface GitHubService {
     suspend fun listRepos(@Path user: String): JsonElement
 }
 
-@OptIn(KtorExperimentalAPI::class)
 val httpClient = HttpClient(CIO) {
-    install(JsonFeature) {
-        serializer = GsonSerializer()
+    install(ContentNegotiation) {
+        gson()
     }
     install(Logging) {
         level = LogLevel.ALL
