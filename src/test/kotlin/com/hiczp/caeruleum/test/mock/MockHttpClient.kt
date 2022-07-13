@@ -4,9 +4,10 @@ import com.github.salomonbrys.kotson.jsonObject
 import com.hiczp.caeruleum.Caeruleum
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.logging.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
+import io.ktor.serialization.gson.*
 import io.ktor.utils.io.*
 
 fun createMockHttpClient() = HttpClient(MockEngine) {
@@ -53,7 +54,9 @@ fun createMockHttpClient() = HttpClient(MockEngine) {
         }
     }
 
-    install(JsonFeature)
+    install(ContentNegotiation) {
+        gson()
+    }
     install(Logging) {
         level = LogLevel.ALL
     }

@@ -22,8 +22,8 @@ interface GitHubService {
 fun main() {
     //create closeable HttpClient
     val httpClient = HttpClient(CIO) {
-        install(JsonFeature) {
-            serializer = GsonSerializer()
+        install(ContentNegotiation) {
+            gson()
         }
         install(Logging) {
             level = LogLevel.ALL

@@ -59,7 +59,7 @@ internal sealed interface NonAbstractServiceFunction : ServiceFunction {
 
     class KotlinDefaultImpls(
         serviceInterface: Class<*>,
-        targetMethod: Method
+        targetMethod: Method,
     ) : NonAbstractServiceFunction {
         private val defaultImpl = serviceInterface.declaredClasses
             .find { it.simpleName == "DefaultImpls" }!!
@@ -73,7 +73,7 @@ internal sealed interface NonAbstractServiceFunction : ServiceFunction {
 @Suppress("MemberVisibilityCanBePrivate")
 internal sealed class HttpServiceFunction(
     protected val parseResult: HttpServiceFunctionParseResult,
-    protected val httpClient: HttpClient
+    protected val httpClient: HttpClient,
 ) : ServiceFunction {
     protected fun generateHttpRequestBuilder(args: Array<out Any?>) =
         parseResult.generateHttpRequestBuilder(args)
@@ -85,13 +85,13 @@ internal sealed class HttpServiceFunction(
         if (parseResult.realReturnTypeInfo.type.isSuperclassOf(HttpResponse::class)) {
             { args -> generateHttpStatement(args).execute() }
         } else {
-            { args -> generateHttpStatement(args).execute { it.call.receive(parseResult.realReturnTypeInfo) } }
+            { args -> generateHttpStatement(args).execute { it.call.body(parseResult.realReturnTypeInfo) } }
         }
 
     //no need to send real request when return value is HttpRequestBuilder, HttpRequestData, HttpStatement
     internal sealed class NoRealRequest(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient
+        httpClient: HttpClient,
     ) : HttpServiceFunction(parseResult, httpClient) {
         private val argumentProcessor: (args: Array<out Any?>) -> Array<out Any?> =
             if (parseResult.isSuspend) {
@@ -113,7 +113,7 @@ internal sealed class HttpServiceFunction(
 
         internal class HttpRequestBuilder(
             parseResult: HttpServiceFunctionParseResult,
-            httpClient: HttpClient
+            httpClient: HttpClient,
         ) : NoRealRequest(parseResult, httpClient) {
             override val responseGenerator: (args: Array<out Any?>) -> Any =
                 { args -> generateHttpRequestBuilder(args) }
@@ -121,7 +121,7 @@ internal sealed class HttpServiceFunction(
 
         internal class HttpRequestData(
             parseResult: HttpServiceFunctionParseResult,
-            httpClient: HttpClient
+            httpClient: HttpClient,
         ) : NoRealRequest(parseResult, httpClient) {
             override val responseGenerator: (args: Array<out Any?>) -> Any =
                 { args -> generateHttpRequestBuilder(args).build() }
@@ -129,7 +129,7 @@ internal sealed class HttpServiceFunction(
 
         internal class HttpStatement(
             parseResult: HttpServiceFunctionParseResult,
-            httpClient: HttpClient
+            httpClient: HttpClient,
         ) : NoRealRequest(parseResult, httpClient) {
             override val responseGenerator: (args: Array<out Any?>) -> Any =
                 { args -> generateHttpStatement(args) }
@@ -138,7 +138,7 @@ internal sealed class HttpServiceFunction(
 
     internal class Blocking(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient
+        httpClient: HttpClient,
     ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
@@ -149,7 +149,7 @@ internal sealed class HttpServiceFunction(
 
     internal class Suspend(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient
+        httpClient: HttpClient,
     ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
@@ -164,7 +164,7 @@ internal sealed class HttpServiceFunction(
 
     internal class Job(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient
+        httpClient: HttpClient,
     ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 
@@ -175,7 +175,7 @@ internal sealed class HttpServiceFunction(
 
     internal class SuspendAndJob(
         parseResult: HttpServiceFunctionParseResult,
-        httpClient: HttpClient
+        httpClient: HttpClient,
     ) : HttpServiceFunction(parseResult, httpClient) {
         private val suspendExecutor = generateSuspendExecutor()
 

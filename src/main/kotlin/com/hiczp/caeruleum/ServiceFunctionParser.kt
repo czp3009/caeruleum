@@ -256,7 +256,7 @@ internal fun parseHttpServiceFunction(
                     check(!gotBody) { "Multiple @Body method annotations found" }
                     gotBody = true
                     actions[index].add { value ->
-                        body = value
+                        setBody(value)
                     }
                     //Content-Type priority: OutGoingContent.contentType > @Body > @DefaultContentType
                     val contentType = (annotation.value.takeIf { it.isNotEmpty() }
