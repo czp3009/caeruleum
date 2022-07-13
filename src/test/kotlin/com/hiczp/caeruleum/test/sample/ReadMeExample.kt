@@ -7,8 +7,9 @@ import com.hiczp.caeruleum.annotation.Get
 import com.hiczp.caeruleum.annotation.Path
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.features.json.*
-import io.ktor.client.features.logging.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.serialization.gson.*
 import kotlinx.coroutines.runBlocking
 
 //define HTTP API in interface with annotation
@@ -21,8 +22,8 @@ interface GitHubService {
 fun main() {
     //create closeable HttpClient
     val httpClient = HttpClient(CIO) {
-        install(JsonFeature) {
-            serializer = GsonSerializer()
+        install(ContentNegotiation) {
+            gson()
         }
         install(Logging) {
             level = LogLevel.ALL

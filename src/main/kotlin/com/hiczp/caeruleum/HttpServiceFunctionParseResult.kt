@@ -49,13 +49,13 @@ internal data class HttpServiceFunctionParseResult(
         //preAction and postAction
         when {
             isFormUrlEncoded -> {
-                preAction = { body = ParametersBuilder() }
-                postAction = { body = FormDataContent((body as ParametersBuilder).build()) }
+                preAction = { setBody(ParametersBuilder()) }
+                postAction = {  setBody(FormDataContent((body as ParametersBuilder).build())) }
             }
             isMultipart -> {
-                preAction = { body = mutableListOf<FormPart<*>>() }
+                preAction = { setBody(mutableListOf<FormPart<*>>()) }
                 @Suppress("UNCHECKED_CAST")
-                postAction = { body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())) }
+                postAction = { setBody(MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))) }
             }
             else -> {
                 preAction = {}
