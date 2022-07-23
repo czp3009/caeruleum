@@ -7,7 +7,8 @@ import kotlin.annotation.AnnotationTarget.FUNCTION
 @Repeatable
 annotation class Attribute(val key: String, val value: String = "")
 
-//container of Attribute
+//Container of Attribute
+@Deprecated("Kotlin support repeatable annotation since 1.6, please use @Attribute instead")
 @MustBeDocumented
 @Target(FUNCTION)
 @Repeatable
