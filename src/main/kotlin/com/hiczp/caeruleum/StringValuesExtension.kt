@@ -3,7 +3,6 @@ package com.hiczp.caeruleum
 import io.ktor.util.*
 import java.lang.reflect.Array
 
-@OptIn(InternalAPI::class)
 internal fun StringValuesBuilder.appendValueAsStringList(name: String, value: Any) {
     val values = when {
         value.javaClass.isArray -> (0 until Array.getLength(value)).mapNotNull { index ->
@@ -17,7 +16,6 @@ internal fun StringValuesBuilder.appendValueAsStringList(name: String, value: An
     }
 }
 
-@OptIn(InternalAPI::class)
 internal fun StringValuesBuilder.appendMap(value: Map<*, *>) {
     value.forEach { (key, value) ->
         if (key != null && value != null) {
