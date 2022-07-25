@@ -10,10 +10,12 @@ buildscript {
 }
 
 group = 'com.hiczp'
-version = '2.0.0-SNAPSHOT'
+version = '2.0.0'
 description = 'Retrofit inspired Http client base on ktor-client'
 
 apply plugin: 'kotlin'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
 
 repositories {
     mavenCentral()
@@ -69,7 +71,63 @@ dependencies {
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
     testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.36'
 }
-
 test {
     useTestNG()
+}
+
+//publish
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+publishing {
+    repositories {
+        maven {
+            url = 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+            credentials {
+                username = project.properties.ossUsername
+                password = project.properties.ossPassword
+            }
+        }
+    }
+
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            pom {
+                name = project.name
+                description = project.description
+                url = 'https://github.com/czp3009/caeruleum'
+
+                licenses {
+                    license {
+                        name = 'Apache License Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'czp3009'
+                        name = 'czp3009'
+                        email = 'czp3009@gmail.com'
+                        url = 'https://www.hiczp.com'
+                    }
+                }
+
+                scm {
+                    connection = 'scm:git:git://github.com/czp3009/caeruleum.git'
+                    developerConnection = 'scm:git:ssh://github.com/czp3009/caeruleum.git'
+                    url = 'https://github.com/czp3009/caeruleum'
+                }
+            }
+        }
+    }
+}
+signing {
+    sign publishing.publications.mavenJava
+}
+gradle.taskGraph.whenReady { taskGraph ->
+    tasks.signMavenJavaPublication.onlyIf { taskGraph.hasTask tasks.publish }
 }
