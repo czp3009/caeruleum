@@ -1,104 +1,79 @@
 package com.hiczp.caeruleum
 
 import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.statement.*
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import java.lang.invoke.MethodHandles
-import java.lang.reflect.Modifier
-import java.lang.reflect.Proxy.newProxyInstance
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
-import kotlin.reflect.jvm.kotlinFunction
+import kotlin.reflect.full.allSuperclasses
 
-@PublishedApi
-internal fun dynamicProxyToHttpClient(kClass: KClass<*>, httpClient: HttpClient, baseUrl: String?): Any {
-    val javaClass = kClass.java
-    require(javaClass.isInterface) { "API declarations must be interfaces" }
-    require(javaClass.interfaces.isEmpty()) { "API interfaces must not extend other interfaces" }
+/**
+ * Share Caeruleum instance between multi HttpClients to make full use of ServiceFunction cache
+ * @param useCache save resolved ServiceFunction and reuse it, default is true
+ */
+class Caeruleum(useCache: Boolean = true) {
+    private val resolveServiceFunction: (method: Method, parse: (method: Method) -> ServiceFunction) -> ServiceFunction
 
-    return newProxyInstance(javaClass.classLoader, arrayOf(javaClass)) { proxy, method, args ->
-        if (!httpClient.isActive) throw CancellationException("Parent context in HttpClient is cancelled")
-
-        val kFunction = method.kotlinFunction
-        when {
-            //if isSynthetic
-            kFunction == null -> method(proxy, *args.orEmpty())
-
-            //method in Object
-            method.declaringClass == Any::class.java -> when (method.name) {
-                "equals" -> when {
-                    args == null -> false
-                    args[0] === proxy -> true
-                    args[0] !is java.lang.reflect.Proxy -> false
-                    else -> args[0]!!.javaClass.interfaces.let {
-                        if (it.size != 1) false else it[0] == javaClass
-                    }
-                }
-                "hashCode" -> kClass.qualifiedName.hashCode()
-                "toString" -> "Service interface ${kClass.qualifiedName}"
-                else -> Unit   //Impossible
-            }
-
-            //non-abstract method
-            !kFunction.isAbstract -> {
-                //default method
-                if (!Modifier.isAbstract(method.modifiers)) {
-                    // Because the service interface might not be public, we need to use a MethodHandle lookup
-                    // that ignores the visibility of the declaringClass
-                    MethodHandles.Lookup::class.java.getDeclaredConstructor(
-                        Class::class.java,
-                        Int::class.javaPrimitiveType
-                    ).apply {
-                        setAccessible(true)
-                    }.newInstance(javaClass, -1)
-                        .unreflectSpecial(method, javaClass)
-                        .bindTo(proxy)
-                        .invokeWithArguments(*args.orEmpty())
-                } else { //non-abstract kotlin function
-                    javaClass.declaredClasses.find {
-                        it.simpleName == "DefaultImpls"
-                    }!!.getDeclaredMethod(
-                        method.name,
-                        javaClass,
-                        *method.parameterTypes
-                    )(null, proxy, *args.orEmpty())
-                }
-            }
-
-            else -> {
-                val serviceFunction = ServiceFunction(kClass, kFunction)
-                if (serviceFunction.isSuspend) {
-                    @Suppress("UNCHECKED_CAST")
-                    val continuation = args!!.last() as Continuation<Any>
-                    val realArgs = args.copyOf(args.size - 1)
-                    httpClient.launch {
-                        runCatching {
-                            HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, realArgs), httpClient)
-                                .executeAndReceive(serviceFunction.returnTypeInfo)
-                        }.run(continuation::resumeWith)
-                    }
-                    COROUTINE_SUSPENDED
-                } else {
-                    httpClient.async {
-                        HttpStatement(serviceFunction.httpRequestBuilder(baseUrl, args.orEmpty()), httpClient)
-                            .executeAndReceive(serviceFunction.returnTypeInfo)
-                    }
-                }
-            }
+    init {
+        resolveServiceFunction = if (useCache) {
+            val cachedServiceFunctions = ConcurrentHashMap<Method, ServiceFunction>()
+            ({ method, parse -> cachedServiceFunctions.computeIfAbsent(method) { parse(it) } })
+        } else {
+            { method, parse -> parse(method) }
         }
     }
+
+    /**
+     * Create ServiceInterface implementation
+     * @param serviceInterfaceKClass ServiceInterface
+     * @param httpClient the HttpClient which HttpStatement bind to
+     * @param baseUrl Programmatically baseUrl, if not null this value override class level @BaseUrl
+     * @throws IllegalArgumentException If ServiceInterface is not interface or has type parameters
+     */
+    fun <T : Any> create(
+        serviceInterfaceKClass: KClass<T>,
+        httpClient: HttpClient,
+        baseUrl: String? = null
+    ): T {
+        val serviceInterfaceJClass = serviceInterfaceKClass.java
+        //check if interface
+        require(serviceInterfaceJClass.isInterface) { "API declarations must be interfaces" }
+        //check generic type
+        require(serviceInterfaceKClass.typeParameters.isEmpty()) { "Type parameters are unsupported on ${serviceInterfaceKClass.qualifiedName}" }
+        //check generic type in super interface
+        val superInterfaceWithTypeParameters = serviceInterfaceKClass.allSuperclasses.find {
+            it.typeParameters.isNotEmpty()
+        }
+        require(superInterfaceWithTypeParameters == null) {
+            "Type parameters are unsupported on ${superInterfaceWithTypeParameters!!.qualifiedName} which is an interface of ${serviceInterfaceKClass.qualifiedName}"
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        return Proxy.newProxyInstance(
+            serviceInterfaceJClass.classLoader,
+            arrayOf(serviceInterfaceJClass)
+        ) { proxy, method, args ->
+            resolveServiceFunction(method) {
+                parseServiceFunction(
+                    kClass = serviceInterfaceKClass,
+                    method = it,
+                    httpClient = httpClient,
+                    baseUrl = baseUrl
+                )
+            }(proxy, method, args)
+        } as T
+    }
+
+    inline fun <reified T : Any> create(
+        httpClient: HttpClient,
+        baseUrl: String? = null
+    ) = create(T::class, httpClient, baseUrl)
 }
 
-inline fun <reified T> HttpClient.create(baseUrl: String? = null) =
-    dynamicProxyToHttpClient(T::class, this, baseUrl) as T
-
-private suspend inline fun HttpStatement.executeAndReceive(returnTypeInfo: TypeInfo) = when (returnTypeInfo.type) {
-    HttpStatement::class -> this
-    HttpResponse::class -> execute()
-    else -> execute { it.call.receive(returnTypeInfo) }
-}
+@Suppress("unused")
+@Deprecated(
+    message = "Instantiate Caeruleum to share HttpClient between multi service interfaces",
+    replaceWith = ReplaceWith("Caeruleum().create<T>(this, baseUrl)")
+)
+inline fun <reified T : Any> HttpClient.create(baseUrl: String? = null) =
+    Caeruleum().create<T>(this, baseUrl)

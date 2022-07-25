@@ -1,297 +1,194 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.hiczp.caeruleum
 
-import com.hiczp.caeruleum.annotation.*
-import com.hiczp.caeruleum.annotation.Headers
-import com.hiczp.caeruleum.annotation.Url
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import io.ktor.http.content.*
-import io.ktor.util.*
-import kotlinx.coroutines.Job
-import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.javaType
-import kotlin.reflect.jvm.jvmErasure
+import io.ktor.client.*
+import io.ktor.client.statement.*
+import kotlinx.coroutines.*
+import java.lang.invoke.MethodHandles
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.reflect.full.isSuperclassOf
 
-private val jobType = Job::class.createType()
-private val mapType = Map::class.starProjectedType
-private val anyTypeInfo = TypeInfo(Any::class, Any::class.java)
+internal sealed interface ServiceFunction : InvocationHandler
+
+internal object DoNothingServiceFunction : ServiceFunction {
+    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any = Unit
+}
+
+internal object SyntheticServiceFunction : ServiceFunction {
+    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any = method(proxy, *args.orEmpty())
+}
+
+internal open class ConstantServiceFunction(private val returnValue: Any) : ServiceFunction {
+    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?) = returnValue
+}
+
+internal sealed class ObjectDeclaredServiceFunction(protected val serviceInterface: Class<*>) : ServiceFunction {
+    internal class Equals(serviceInterface: Class<*>) : ObjectDeclaredServiceFunction(serviceInterface) {
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
+            val other = args?.getOrNull(0) ?: return false
+            if (other === proxy) return true
+            if (other !is java.lang.reflect.Proxy) return false
+            val otherInterfaces = other.javaClass.interfaces
+            return if (otherInterfaces.size != 1) false else otherInterfaces[0] == serviceInterface
+        }
+    }
+
+    internal class HashCode(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.name.hashCode())
+
+    internal class ToString(serviceInterface: Class<*>) : ConstantServiceFunction(serviceInterface.name)
+}
+
+internal sealed interface NonAbstractServiceFunction : ServiceFunction {
+    class DefaultMethod(serviceInterface: Class<*>, targetMethod: Method) : NonAbstractServiceFunction {
+        private val methodHandler = lookUpConstructor.newInstance(serviceInterface, -1)
+            .unreflectSpecial(targetMethod, serviceInterface)
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any =
+            methodHandler.bindTo(proxy).invokeWithArguments(*args.orEmpty())
+
+        companion object {
+            private val lookUpConstructor = MethodHandles.Lookup::class.java
+                .getDeclaredConstructor(Class::class.java, Int::class.javaPrimitiveType)
+                .apply { setAccessible(true) }
+        }
+    }
+
+    @Suppress("SpellCheckingInspection")
+    class KotlinDefaultImpls(
+        serviceInterface: Class<*>,
+        targetMethod: Method,
+    ) : NonAbstractServiceFunction {
+        private val defaultImpl = serviceInterface.declaredClasses
+            .find { it.simpleName == "DefaultImpls" }!!
+            .getDeclaredMethod(targetMethod.name, serviceInterface, *targetMethod.parameterTypes)
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any =
+            defaultImpl(null, proxy, *args.orEmpty())
+    }
+}
 
 @Suppress("MemberVisibilityCanBePrivate")
-internal class ServiceFunction(kClass: KClass<*>, kFunction: KFunction<*>) {
-    val isSuspend = kFunction.isSuspend
-    val isJob = kFunction.returnType.isSubtypeOf(jobType)
+internal sealed class HttpServiceFunction(
+    protected val parseResult: HttpServiceFunctionParseResult,
+    protected val httpClient: HttpClient,
+) : ServiceFunction {
+    protected fun generateHttpRequestBuilder(args: Array<out Any?>) =
+        parseResult.generateHttpRequestBuilder(args)
 
-    init {
-        if (!isSuspend && !isJob || isSuspend && isJob) {
-            error("Service functions must be suspend or return $jobType")
-        }
-    }
+    protected fun generateHttpStatement(args: Array<out Any?>) =
+        HttpStatement(generateHttpRequestBuilder(args), httpClient)
 
-    val returnTypeInfo = with(kFunction.returnType) {
-        if (isJob) {
-            arguments.firstOrNull()?.type?.let { TypeInfo(it.jvmErasure, it.javaType) } ?: anyTypeInfo
+    protected fun generateSuspendExecutor(): suspend (args: Array<out Any?>) -> Any =
+        if (parseResult.realReturnTypeInfo.type.isSuperclassOf(HttpResponse::class)) {
+            { args -> generateHttpStatement(args).execute() }
         } else {
-            TypeInfo(this.jvmErasure, this.javaType)
-        }
-    }
-    private val actions = Array(kFunction.valueParameters.size) {
-        mutableListOf<HttpRequestBuilder.(value: Any) -> Unit>()
-    }
-
-    private val headers = HeadersBuilder()
-    private var httpMethod: HttpMethod? = null
-    private val attributes = Attributes(concurrent = false)
-
-    private val preAction: HttpRequestBuilder.() -> Unit
-    private val postAction: HttpRequestBuilder.() -> Unit
-    private val particlePathAction: URLBuilder.() -> Unit
-    private var particlePath = ""
-
-    init {
-        var isFormUrlEncoded = false
-        var isMultipart = false
-        fun parseHttpMethodAndPath(method: HttpMethod, path: String) {
-            if (httpMethod != null) error("Only one HTTP method is allowed")
-            httpMethod = method
-            particlePath = path
+            { args -> generateHttpStatement(args).execute { it.call.body(parseResult.realReturnTypeInfo) } }
         }
 
-        kFunction.annotations.forEach {
-            when (it) {
-                is Get -> parseHttpMethodAndPath(HttpMethod.Get, it.value)
-                is Post -> parseHttpMethodAndPath(HttpMethod.Post, it.value)
-                is Put -> parseHttpMethodAndPath(HttpMethod.Put, it.value)
-                is Patch -> parseHttpMethodAndPath(HttpMethod.Patch, it.value)
-                is Delete -> parseHttpMethodAndPath(HttpMethod.Delete, it.value)
-                is Head -> parseHttpMethodAndPath(HttpMethod.Head, it.value)
-                is Options -> parseHttpMethodAndPath(HttpMethod.Options, it.value)
-                is Headers -> {
-                    it.value.forEach { header ->
-                        val colon = header.indexOf(':')
-                        if (colon == -1 || colon == 0 || colon == header.length - 1) {
-                            error("@Headers value must be in the form 'Name: Value'")
-                        }
-                        headers.append(
-                            header.substring(0, colon),
-                            header.substring(colon + 1).trim()
-                        )
-                    }
-                }
-                is FormUrlEncoded -> {
-                    if (isMultipart) error("Only one encoding annotation is allowed")
-                    isFormUrlEncoded = true
-                }
-                is Multipart -> {
-                    if (isFormUrlEncoded) error("Only one encoding annotation is allowed")
-                    isMultipart = true
-                }
-                is Attribute -> attributes.put(AttributeKey(it.key), it.value)
-            }
-        }
-        if (httpMethod == null) error("HTTP method annotation is required")
-
-        var gotUrl = false
-        var gotPath = false
-        var gotQuery = false
-        var gotQueryMap = false
-        var gotBody = false
-        kFunction.valueParameters.forEachIndexed { index, kParameter ->
-            fun String.orParameterName() = if (isEmpty()) kParameter.name ?: this else this
-
-            kParameter.annotations.forEach { annotation ->
-                fun parseQuery(annotationValues: Array<out String>) {
-                    annotationValues.forEach {
-                        val name = it.orParameterName()
-                        gotQuery = true
-                        actions[index].add { value ->
-                            url.parameters.appendIterableValue(name, value)
-                        }
-                    }
-                }
-
-                fun parseField(annotationValues: Array<out String>) {
-                    if (!isFormUrlEncoded) error("@Field parameters can only be used with form encoding")
-                    annotationValues.forEach {
-                        val name = it.orParameterName()
-                        actions[index].add { value ->
-                            (body as ParametersBuilder).appendIterableValue(name, value)
-                        }
-                    }
-                }
-
-                when (annotation) {
-                    is Url -> {
-                        if (gotUrl) error("Multiple @Url method annotations found")
-                        if (gotPath) error("@Path parameters may not be used with @Url")
-                        if (gotQuery || gotQueryMap) error("A @Url parameter must not come after @Query or @QueryMap")
-                        if (particlePath.isNotEmpty()) error("@Url cannot be used with ${httpMethod!!.value} URL")
-                        gotUrl = true
-                        actions[index].add { value ->
-                            url.takeFrom(value.toString())
-                        }
-                    }
-
-                    is Path -> {
-                        if (gotQuery || gotQueryMap) error("A @Path parameter must not come after a @Query or @QueryMap")
-                        if (gotUrl) error("@Path parameters may not be used with @Url")
-                        if (particlePath.isEmpty()) error("@Path can only be used with relative url on ${httpMethod!!.value}")
-                        gotPath = true
-                        val name = "{${annotation.value.orParameterName()}}"
-                        actions[index].add { value ->
-                            url.encodedPath = url.encodedPath.replace(
-                                name,
-                                value.toString().encodeURLPath()
-                            )
-                        }
-                    }
-
-                    is Header -> {
-                        val name = annotation.value.orParameterName()
-                        actions[index].add { value ->
-                            headers.append(name, value.toString())
-                        }
-                    }
-
-                    is HeaderMap -> {
-                        if (!kParameter.type.isSubtypeOf(mapType)) {
-                            error("@HeaderMap parameter type must be Map")
-                        }
-                        actions[index].add { value ->
-                            headers.appendMap(value)
-                        }
-                    }
-
-                    is Query -> parseQuery(annotation.value)
-
-                    is QueryMap -> {
-                        if (!kParameter.type.isSubtypeOf(mapType)) {
-                            error("@QueryMap parameter type must be Map")
-                        }
-                        gotQueryMap = true
-                        actions[index].add { value ->
-                            url.parameters.appendMap(value)
-                        }
-                    }
-
-                    is Field -> parseField(annotation.value)
-
-                    is FieldMap -> {
-                        if (!isFormUrlEncoded) error("@FieldMap parameters can only be used with form encoding")
-                        if (!kParameter.type.isSubtypeOf(mapType)) {
-                            error("@FieldMap parameters can only be used with form encoding")
-                        }
-                        actions[index].add { value ->
-                            val body = body as ParametersBuilder
-                            body.appendMap(value)
-                        }
-                    }
-
-                    is Part -> {
-                        if (!isMultipart) error("@Part parameters can only be used with multipart encoding")
-                        val name = annotation.value.orParameterName()
-                        actions[index].add { value ->
-                            @Suppress("UNCHECKED_CAST")
-                            (body as MutableList<FormPart<*>>).add(FormPart(name, value))
-                        }
-                    }
-
-                    is PartMap -> {
-                        require(isMultipart) { "@PartMap parameters can only be used with multipart encoding" }
-                        if (!kParameter.type.isSubtypeOf(mapType)) {
-                            error("@FieldMap parameter type must be Map")
-                        }
-                        actions[index].add { value ->
-                            @Suppress("UNCHECKED_CAST")
-                            val body = body as MutableList<FormPart<*>>
-                            (value as Map<*, *>).forEach { (partName, partValue) ->
-                                if (partName != null && partValue != null) {
-                                    body.add(FormPart(partName.toString(), partValue))
-                                }
-                            }
-                        }
-                    }
-
-                    is Body -> {
-                        if (isFormUrlEncoded || isMultipart) error("@Body parameters cannot be used with form or multi-part encoding")
-                        if (gotBody) error("Multiple @Body method annotations found")
-                        gotBody = true
-                        actions[index].add { value ->
-                            body = value
-                        }
-                        //Content-Type priority: OutGoingContent.contentType > @Body > @DefaultContentType
-                        val contentTypeInAnnotation = (annotation.value.takeIf { it.isNotEmpty() }
-                            ?: kClass.findAnnotation<DefaultContentType>()?.value?.takeIf { it.isNotEmpty() })
-                            ?.let { ContentType.parse(it) }
-                        if (contentTypeInAnnotation != null) {
-                            actions[index].add { value ->
-                                if (value !is OutgoingContent || value.contentType == null) {
-                                    contentType(contentTypeInAnnotation)
-                                }
-                            }
-                        }
-                    }
-
-                    is Queries -> annotation.value.forEach { parseQuery(it.value) }
-
-                    is Fields -> annotation.value.forEach { parseField(it.value) }
-                }
-            }
-        }
-
-        particlePathAction = if (particlePath.isNotEmpty()) {
-            if (particlePath.startsWith('/')) {
-                fun URLBuilder.() { encodedPath = particlePath }
+    //no need to send real request when return value is HttpRequestBuilder, HttpRequestData, HttpStatement
+    internal sealed class NoRealRequest(
+        parseResult: HttpServiceFunctionParseResult,
+        httpClient: HttpClient,
+    ) : HttpServiceFunction(parseResult, httpClient) {
+        private val argumentProcessor: (args: Array<out Any?>) -> Array<out Any?> =
+            if (parseResult.isSuspend) {
+                { args -> args.copyOfRange(0, args.size - 1) }
             } else {
-                fun URLBuilder.() { encodedPath += particlePath }
+                { args -> args }
             }
-        } else {
-            {}
+        abstract val responseGenerator: (args: Array<out Any?>) -> Any
+        private val returnValueWrapper: (value: Any) -> Any =
+            if (parseResult.returnTypeIsJob) {
+                { value -> CompletableDeferred(value) }
+            } else {
+                { value -> value }
+            }
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
+            return argumentProcessor(args.orEmpty()).let(responseGenerator).let(returnValueWrapper)
         }
 
-        when {
-            isFormUrlEncoded -> {
-                preAction = { body = ParametersBuilder() }
-                postAction = { body = FormDataContent((body as ParametersBuilder).build()) }
-            }
-            isMultipart -> {
-                preAction = { body = mutableListOf<FormPart<*>>() }
-                @Suppress("UNCHECKED_CAST")
-                postAction = { body = MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())) }
-            }
-            else -> {
-                preAction = {}
-                postAction = {}
-            }
+        internal class HttpRequestBuilder(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient,
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpRequestBuilder(args) }
+        }
+
+        internal class HttpRequestData(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient,
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpRequestBuilder(args).build() }
+        }
+
+        internal class HttpStatement(
+            parseResult: HttpServiceFunctionParseResult,
+            httpClient: HttpClient,
+        ) : NoRealRequest(parseResult, httpClient) {
+            override val responseGenerator: (args: Array<out Any?>) -> Any =
+                { args -> generateHttpStatement(args) }
         }
     }
 
-    private val baseUrlAnnotationValue = kClass.findAnnotation<BaseUrl>()?.value
+    internal class Blocking(
+        parseResult: HttpServiceFunctionParseResult,
+        httpClient: HttpClient,
+    ) : HttpServiceFunction(parseResult, httpClient) {
+        private val suspendExecutor = generateSuspendExecutor()
 
-    fun httpRequestBuilder(baseUrl: String?, args: Array<out Any?>) =
-        HttpRequestBuilder().apply {
-            this.headers.appendAll(headers)
-            method = httpMethod!!
-            attributes.allKeys.forEach {
-                @Suppress("UNCHECKED_CAST")
-                this.attributes.put(it as AttributeKey<Any>, attributes[it])
-            }
-        }.apply {
-            //if no url set, ktor will use localhost as host
-            (baseUrl ?: baseUrlAnnotationValue)?.let {
-                url.takeFrom(URLBuilder(it).apply { particlePathAction() })
-            } ?: if (particlePath.isNotEmpty()) url.takeFrom(particlePath)
-            preAction()
-            args.forEachIndexed { index, arg ->
-                if (arg != null) {
-                    actions[index].forEach {
-                        it(arg)
-                    }
-                }
-            }
-            postAction()
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?) = runBlocking {
+            suspendExecutor(args.orEmpty())
         }
+    }
+
+    internal class Suspend(
+        parseResult: HttpServiceFunctionParseResult,
+        httpClient: HttpClient,
+    ) : HttpServiceFunction(parseResult, httpClient) {
+        private val suspendExecutor = generateSuspendExecutor()
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
+            val (realArgs, continuation) = args!!.parseSuspendFunArgs()
+            CoroutineScope(continuation.context).launch {
+                runCatching { suspendExecutor(realArgs) }.run(continuation::resumeWith)
+            }
+            return COROUTINE_SUSPENDED
+        }
+    }
+
+    internal class Job(
+        parseResult: HttpServiceFunctionParseResult,
+        httpClient: HttpClient,
+    ) : HttpServiceFunction(parseResult, httpClient) {
+        private val suspendExecutor = generateSuspendExecutor()
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
+            return httpClient.async { suspendExecutor(args.orEmpty()) }
+        }
+    }
+
+    internal class SuspendAndJob(
+        parseResult: HttpServiceFunctionParseResult,
+        httpClient: HttpClient,
+    ) : HttpServiceFunction(parseResult, httpClient) {
+        private val suspendExecutor = generateSuspendExecutor()
+
+        override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any {
+            val (realArgs, continuation) = args!!.parseSuspendFunArgs()
+            return CoroutineScope(continuation.context).async { suspendExecutor(realArgs) }
+        }
+    }
+
+    protected companion object {
+        @Suppress("NOTHING_TO_INLINE")
+        protected inline fun Array<out Any?>.parseSuspendFunArgs() =
+            copyOfRange(0, size - 1) to get(size - 1) as Continuation<Any>
+    }
 }

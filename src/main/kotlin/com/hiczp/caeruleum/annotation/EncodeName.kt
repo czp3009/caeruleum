@@ -1,7 +1,7 @@
 package com.hiczp.caeruleum.annotation
 
 /**
- * For enum
+ * For enum value
  */
 @MustBeDocumented
 @Target(AnnotationTarget.FIELD)

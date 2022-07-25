@@ -1,17 +1,17 @@
-# Caeruleum
+package com.hiczp.caeruleum.test.sample
 
-Retrofit inspired Http client base on ktor-client.
+import com.google.gson.JsonElement
+import com.hiczp.caeruleum.Caeruleum
+import com.hiczp.caeruleum.annotation.BaseUrl
+import com.hiczp.caeruleum.annotation.Get
+import com.hiczp.caeruleum.annotation.Path
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.serialization.gson.*
+import kotlinx.coroutines.runBlocking
 
-# Gradle
-
-```groovy
-// https://mvnrepository.com/artifact/com.hiczp/caeruleum
-implementation group: 'com.hiczp', name: 'caeruleum', version: '2.0.0'
-```
-
-# Usage
-
-```kotlin
 //define HTTP API in interface with annotation
 @BaseUrl("https://api.github.com")
 interface GitHubService {
@@ -38,12 +38,3 @@ fun main() {
     //cleanup
     httpClient.close()
 }
-```
-
-Engine is optional, example above use CIO engine.
-
-see all available engine here https://ktor.io/clients/http-client/engines.html
-
-# License
-
-Apache License 2.0
