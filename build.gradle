@@ -10,7 +10,7 @@ buildscript {
 }
 
 group = 'com.hiczp'
-version = '2.0.0'
+version = '2.0.1-SNAPSHOT'
 description = 'Retrofit inspired Http client base on ktor-client'
 
 apply plugin: 'kotlin'
