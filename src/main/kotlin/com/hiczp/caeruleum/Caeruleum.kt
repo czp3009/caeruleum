@@ -70,6 +70,7 @@ class Caeruleum(useCache: Boolean = true) {
     ) = create(T::class, httpClient, baseUrl)
 }
 
+@Suppress("unused")
 @Deprecated(
     message = "Instantiate Caeruleum to share HttpClient between multi service interfaces",
     replaceWith = ReplaceWith("Caeruleum().create<T>(this, baseUrl)")

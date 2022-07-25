@@ -57,6 +57,7 @@ internal sealed interface NonAbstractServiceFunction : ServiceFunction {
         }
     }
 
+    @Suppress("SpellCheckingInspection")
     class KotlinDefaultImpls(
         serviceInterface: Class<*>,
         targetMethod: Method,

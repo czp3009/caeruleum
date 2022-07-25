@@ -6,6 +6,7 @@ import io.ktor.http.*
 import io.ktor.util.*
 import io.ktor.util.reflect.*
 
+//no need to override hashcode and equals since never use this class as the key of Map
 @Suppress("ArrayInDataClass", "MemberVisibilityCanBePrivate")
 internal data class HttpServiceFunctionParseResult(
     val isSuspend: Boolean,
@@ -50,12 +51,14 @@ internal data class HttpServiceFunctionParseResult(
         when {
             isFormUrlEncoded -> {
                 preAction = { setBody(ParametersBuilder()) }
-                postAction = {  setBody(FormDataContent((body as ParametersBuilder).build())) }
+                postAction = { setBody(FormDataContent((body as ParametersBuilder).build())) }
             }
             isMultipart -> {
                 preAction = { setBody(mutableListOf<FormPart<*>>()) }
                 @Suppress("UNCHECKED_CAST")
-                postAction = { setBody(MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray()))) }
+                postAction = {
+                    setBody(MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())))
+                }
             }
             else -> {
                 preAction = {}

@@ -56,10 +56,10 @@ dependencies {
     testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test'
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
     testImplementation group: 'io.ktor', name: 'ktor-client-cio', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-serialization-gson
-    testImplementation group: 'io.ktor', name: 'ktor-serialization-gson', version: ktor_version
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-content-negotiation
     testImplementation group: 'io.ktor', name: 'ktor-client-content-negotiation', version: ktor_version
+    // https://mvnrepository.com/artifact/io.ktor/ktor-serialization-gson
+    testImplementation group: 'io.ktor', name: 'ktor-serialization-gson', version: ktor_version
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging
     testImplementation group: 'io.ktor', name: 'ktor-client-logging', version: ktor_version
     // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock
