@@ -42,7 +42,7 @@ fun main() {
 
 Engine is optional, example above use CIO engine.
 
-see all available engine here https://ktor.io/clients/http-client/engines.html
+see all available engine here https://ktor.io/docs/http-client-engines.html
 
 # License
 
