@@ -1,7 +1,6 @@
 package com.hiczp.caeruleum
 
 import com.hiczp.caeruleum.annotation.*
-import com.hiczp.caeruleum.annotation.Attributes
 import com.hiczp.caeruleum.annotation.Headers
 import com.hiczp.caeruleum.annotation.Url
 import io.ktor.client.*
@@ -26,22 +25,22 @@ private val mapType = Map::class.starProjectedType
 private val unitTypeInfo = typeInfo<Unit>()
 
 internal fun parseServiceFunction(
-    kClass: KClass<*>,
-    method: Method,
-    httpClient: HttpClient,
-    baseUrl: String?
+        kClass: KClass<*>,
+        method: Method,
+        httpClient: HttpClient,
+        baseUrl: String?
 ): ServiceFunction {
     val jClass = kClass.java
     val kFunction = method.kotlinFunction
     return when {
         //isSynthetic
-        kFunction == null -> SyntheticServiceFunction
+        kFunction == null || method.isSynthetic -> DelegationServiceFunction
         //method in Object
         method.declaringClass == Any::class.java -> when (kFunction.name) {
             "equals" -> ObjectDeclaredServiceFunction.Equals(jClass)
             "hashCode" -> ObjectDeclaredServiceFunction.HashCode(jClass)
             "toString" -> ObjectDeclaredServiceFunction.ToString(jClass)
-            else -> DoNothingServiceFunction  //impossible
+            else -> DelegationServiceFunction  //impossible
         }
         //default method
         method.isDefault -> NonAbstractServiceFunction.DefaultMethod(jClass, method)
@@ -53,8 +52,10 @@ internal fun parseServiceFunction(
                 //no need send real request
                 it.realReturnTypeInfo.type.isSuperclassOf(HttpRequestBuilder::class) ->
                     HttpServiceFunction.NoRealRequest.HttpRequestBuilder(it, httpClient)
+
                 it.realReturnTypeInfo.type.isSuperclassOf(HttpRequestData::class) ->
                     HttpServiceFunction.NoRealRequest.HttpRequestData(it, httpClient)
+
                 it.realReturnTypeInfo.type.isSuperclassOf(HttpStatement::class) ->
                     HttpServiceFunction.NoRealRequest.HttpStatement(it, httpClient)
                 //need send request
@@ -69,9 +70,9 @@ internal fun parseServiceFunction(
 }
 
 internal fun parseHttpServiceFunction(
-    kClass: KClass<*>,
-    kFunction: KFunction<*>,
-    baseUrl: String?
+        kClass: KClass<*>,
+        kFunction: KFunction<*>,
+        baseUrl: String?
 ): HttpServiceFunctionParseResult {
     val isSuspend = kFunction.isSuspend
     val returnTypeIsJob = kFunction.returnType.isSubtypeOf(jobType)
@@ -115,21 +116,23 @@ internal fun parseHttpServiceFunction(
                         error("@Headers value must be in the form 'Name: Value'")
                     }
                     functionLevelHeaders.append(
-                        header.substring(0, colon),
-                        header.substring(colon + 1).trim()
+                            header.substring(0, colon).trim(),
+                            header.substring(colon + 1).trim()
                     )
                 }
             }
+
             is FormUrlEncoded -> {
                 check(!isMultipart) { "Only one encoding annotation is allowed" }
                 isFormUrlEncoded = true
             }
+
             is Multipart -> {
                 check(!isFormUrlEncoded) { "Only one encoding annotation is allowed" }
                 isMultipart = true
             }
+
             is Attribute -> functionLevelAttributes[it.key] = it.value
-            is Attributes -> it.value.forEach { attribute -> functionLevelAttributes[attribute.key] = attribute.value }
         }
     }
     checkNotNull(httpMethod) { "HTTP method annotation is required" }
@@ -186,8 +189,8 @@ internal fun parseHttpServiceFunction(
                     val name = "{${annotation.value.orKParameterName()}}"
                     actions[index].add { value ->
                         url.encodedPath = url.encodedPath.replace(
-                            name,
-                            value.toStringOrEnumName().encodeURLPath()
+                                name,
+                                value.toStringOrEnumName().encodeURLPath()
                         )
                     }
                 }
@@ -260,8 +263,8 @@ internal fun parseHttpServiceFunction(
                     }
                     //Content-Type priority: OutGoingContent.contentType > @Body > @DefaultContentType
                     val contentType = (annotation.value.takeIf { it.isNotEmpty() }
-                        ?: kClass.findAnnotation<DefaultContentType>()?.value?.takeIf { it.isNotEmpty() })
-                        ?.let { ContentType.parse(it) }
+                            ?: kClass.findAnnotation<DefaultContentType>()?.value?.takeIf { it.isNotEmpty() })
+                            ?.let { ContentType.parse(it) }
                     if (contentType != null) {
                         actions[index].add { value ->
                             if (value !is OutgoingContent || value.contentType == null) {
@@ -270,10 +273,6 @@ internal fun parseHttpServiceFunction(
                         }
                     }
                 }
-
-                is Queries -> annotation.value.forEach { parseQuery(it.value) }
-
-                is Fields -> annotation.value.forEach { parseField(it.value) }
             }
         }
     }
@@ -281,17 +280,17 @@ internal fun parseHttpServiceFunction(
     val classLevelBaseUrl = kClass.findAnnotation<BaseUrl>()?.value
 
     return HttpServiceFunctionParseResult(
-        isSuspend = isSuspend,
-        returnTypeIsJob = returnTypeIsJob,
-        realReturnTypeInfo = realReturnTypeInfo,
-        actions = actions,
-        classLevelBaseUrl = classLevelBaseUrl,
-        functionLevelAttributes = functionLevelAttributes.map { AttributeKey<String>(it.key) to it.value },
-        functionLevelHeaders = functionLevelHeaders,
-        functionLevelPath = functionLevelPath,
-        httpMethod = httpMethod!!,
-        isFormUrlEncoded = isFormUrlEncoded,
-        isMultipart = isMultipart,
-        programmaticallyBaseUrl = baseUrl
+            isSuspend = isSuspend,
+            returnTypeIsJob = returnTypeIsJob,
+            realReturnTypeInfo = realReturnTypeInfo,
+            actions = actions,
+            classLevelBaseUrl = classLevelBaseUrl,
+            functionLevelAttributes = functionLevelAttributes.map { AttributeKey<String>(it.key) to it.value },
+            functionLevelHeaders = functionLevelHeaders,
+            functionLevelPath = functionLevelPath,
+            httpMethod = httpMethod!!,
+            isFormUrlEncoded = isFormUrlEncoded,
+            isMultipart = isMultipart,
+            programmaticallyBaseUrl = baseUrl
     )
 }

@@ -8,6 +8,7 @@ internal fun StringValuesBuilder.appendValueAsStringList(name: String, value: An
         value.javaClass.isArray -> (0 until Array.getLength(value)).mapNotNull { index ->
             Array.get(value, index)?.toStringOrEnumName()
         }
+
         value is Iterable<*> -> value.mapNotNull { it?.toStringOrEnumName() }
         else -> listOf(value.toStringOrEnumName())
     }

@@ -31,9 +31,9 @@ class Caeruleum(useCache: Boolean = true) {
      * @throws IllegalArgumentException If ServiceInterface is not interface or has type parameters
      */
     fun <T : Any> create(
-        serviceInterfaceKClass: KClass<T>,
-        httpClient: HttpClient,
-        baseUrl: String? = null
+            serviceInterfaceKClass: KClass<T>,
+            httpClient: HttpClient,
+            baseUrl: String? = null
     ): T {
         val serviceInterfaceJClass = serviceInterfaceKClass.java
         //check if interface
@@ -50,30 +50,22 @@ class Caeruleum(useCache: Boolean = true) {
 
         @Suppress("UNCHECKED_CAST")
         return Proxy.newProxyInstance(
-            serviceInterfaceJClass.classLoader,
-            arrayOf(serviceInterfaceJClass)
+                serviceInterfaceJClass.classLoader,
+                arrayOf(serviceInterfaceJClass)
         ) { proxy, method, args ->
             resolveServiceFunction(method) {
                 parseServiceFunction(
-                    kClass = serviceInterfaceKClass,
-                    method = it,
-                    httpClient = httpClient,
-                    baseUrl = baseUrl
+                        kClass = serviceInterfaceKClass,
+                        method = it,
+                        httpClient = httpClient,
+                        baseUrl = baseUrl
                 )
             }(proxy, method, args)
         } as T
     }
 
     inline fun <reified T : Any> create(
-        httpClient: HttpClient,
-        baseUrl: String? = null
+            httpClient: HttpClient,
+            baseUrl: String? = null
     ) = create(T::class, httpClient, baseUrl)
 }
-
-@Suppress("unused")
-@Deprecated(
-    message = "Instantiate Caeruleum to share HttpClient between multi service interfaces",
-    replaceWith = ReplaceWith("Caeruleum().create<T>(this, baseUrl)")
-)
-inline fun <reified T : Any> HttpClient.create(baseUrl: String? = null) =
-    Caeruleum().create<T>(this, baseUrl)

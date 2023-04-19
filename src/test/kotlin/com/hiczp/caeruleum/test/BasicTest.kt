@@ -11,7 +11,7 @@ import io.ktor.client.statement.*
 import io.ktor.content.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import org.testng.annotations.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class BasicTest {

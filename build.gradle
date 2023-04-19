@@ -1,85 +1,46 @@
-buildscript {
-    repositories {
-        gradlePluginPortal()
-    }
-
-    dependencies {
-        // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-gradle-plugin
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.10'
-    }
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.8.20'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.8.20'
+    id 'maven-publish'
+    id 'signing'
 }
 
 group = 'com.hiczp'
-version = '2.0.1-SNAPSHOT'
+version = '2.1.0-SNAPSHOT'
 description = 'Retrofit inspired Http client base on ktor-client'
-
-apply plugin: 'kotlin'
-apply plugin: 'maven-publish'
-apply plugin: 'signing'
 
 repositories {
     mavenCentral()
 }
 
-//kotlin
+// https://mvnrepository.com/artifact/io.ktor/ktor-client-core
+def ktor_version = '2.2.4'
 dependencies {
-    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-stdlib
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib'
-    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
-}
-def jvm_target = JavaVersion.VERSION_1_8
-def compiler_args = ['-Xjvm-default=all']
-compileKotlin {
-    kotlinOptions {
-        jvmTarget = jvm_target
-        freeCompilerArgs = compiler_args
-    }
-}
-compileTestKotlin {
-    kotlinOptions {
-        jvmTarget = jvm_target
-        freeCompilerArgs = compiler_args
-    }
+    api "io.ktor:ktor-client-core:$ktor_version"
+    implementation 'org.jetbrains.kotlin:kotlin-reflect'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation "io.ktor:ktor-client-cio:$ktor_version"
+    testImplementation "io.ktor:ktor-client-content-negotiation:$ktor_version"
+    testImplementation "io.ktor:ktor-serialization-kotlinx-json:$ktor_version"
+    testImplementation "io.ktor:ktor-client-logging:$ktor_version"
+    testImplementation 'ch.qos.logback:logback-classic:1.4.6'
+    testImplementation "io.ktor:ktor-client-mock:$ktor_version"
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
 }
 
-//ktor
-def ktor_version = '2.0.3'
-dependencies {
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-core
-    implementation group: 'io.ktor', name: 'ktor-client-core', version: ktor_version
-}
-
-//test
-dependencies {
-    // https://mvnrepository.com/artifact/org.testng/testng
-    testImplementation group: 'org.testng', name: 'testng', version: '7.6.1'
-    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-test
-    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test'
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-cio
-    testImplementation group: 'io.ktor', name: 'ktor-client-cio', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-content-negotiation
-    testImplementation group: 'io.ktor', name: 'ktor-client-content-negotiation', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-serialization-gson
-    testImplementation group: 'io.ktor', name: 'ktor-serialization-gson', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-logging
-    testImplementation group: 'io.ktor', name: 'ktor-client-logging', version: ktor_version
-    // https://mvnrepository.com/artifact/io.ktor/ktor-client-mock
-    testImplementation group: 'io.ktor', name: 'ktor-client-mock', version: ktor_version
-    // https://mvnrepository.com/artifact/com.github.salomonbrys.kotson/kotson
-    testImplementation group: 'com.github.salomonbrys.kotson', name: 'kotson', version: '2.5.0'
-    // https://mvnrepository.com/artifact/org.slf4j/slf4j-simple
-    testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.36'
-}
 test {
-    useTestNG()
+    useJUnitPlatform()
 }
 
-//publish
+kotlin {
+    jvmToolchain(17)
+}
+
 java {
     withJavadocJar()
     withSourcesJar()
 }
+
 publishing {
     repositories {
         maven {
@@ -94,19 +55,16 @@ publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-
             pom {
                 name = project.name
                 description = project.description
                 url = 'https://github.com/czp3009/caeruleum'
-
                 licenses {
                     license {
                         name = 'Apache License Version 2.0'
                         url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
                     }
                 }
-
                 developers {
                     developer {
                         id = 'czp3009'
@@ -115,7 +73,6 @@ publishing {
                         url = 'https://www.hiczp.com'
                     }
                 }
-
                 scm {
                     connection = 'scm:git:git://github.com/czp3009/caeruleum.git'
                     developerConnection = 'scm:git:ssh://github.com/czp3009/caeruleum.git'
@@ -125,9 +82,8 @@ publishing {
         }
     }
 }
+
 signing {
+    required { gradle.taskGraph.hasTask(publish) }
     sign publishing.publications.mavenJava
-}
-gradle.taskGraph.whenReady { taskGraph ->
-    tasks.signMavenJavaPublication.onlyIf { taskGraph.hasTask tasks.publish }
 }

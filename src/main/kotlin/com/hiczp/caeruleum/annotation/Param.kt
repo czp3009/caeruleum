@@ -18,18 +18,10 @@ annotation class Header(val value: String)
 @Target(VALUE_PARAMETER)
 annotation class HeaderMap
 
-//Repeatable is supported since Kotlin 1.6, see below
-//https://youtrack.jetbrains.com/issue/KT-12794?_ga=2.40144167.443754125.1569230332-295160856.1538112684
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
 @Repeatable
 annotation class Query(vararg val value: String = [""])
-
-//Container of Query
-@Deprecated("Kotlin support repeatable annotation since 1.6, please use @Query instead")
-@MustBeDocumented
-@Target(VALUE_PARAMETER)
-annotation class Queries(vararg val value: Query)
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)
@@ -39,12 +31,6 @@ annotation class QueryMap
 @Target(VALUE_PARAMETER)
 @Repeatable
 annotation class Field(vararg val value: String = [""])
-
-//Container of Field
-@Deprecated("Kotlin support repeatable annotation since 1.6, please use @Field instead")
-@MustBeDocumented
-@Target(VALUE_PARAMETER)
-annotation class Fields(vararg val value: Field)
 
 @MustBeDocumented
 @Target(VALUE_PARAMETER)

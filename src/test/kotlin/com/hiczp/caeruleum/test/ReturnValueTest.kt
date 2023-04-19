@@ -1,12 +1,12 @@
 package com.hiczp.caeruleum.test
 
-import com.google.gson.JsonElement
 import com.hiczp.caeruleum.annotation.Get
 import com.hiczp.caeruleum.test.mock.createMockService
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
-import org.testng.annotations.Test
+import kotlinx.serialization.json.JsonElement
+import org.junit.jupiter.api.Test
 import kotlin.test.assertTrue
 
 @Suppress("DeferredIsResult", "USELESS_IS_CHECK")

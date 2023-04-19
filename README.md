@@ -2,6 +2,9 @@
 
 Retrofit inspired Http client base on ktor-client.
 
+Note: Please first consider using the [Resources](https://ktor.io/docs/type-safe-request.html) plugin maintained by
+Jetbrains.
+
 # Gradle
 
 ```groovy
@@ -23,13 +26,13 @@ fun main() {
     //create closeable HttpClient
     val httpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
-            gson()
+            json()
         }
         install(Logging) {
             level = LogLevel.ALL
         }
     }
-    //get implement of interface
+    //get implementation of interface
     val githubService = Caeruleum().create<GitHubService>(httpClient)
     runBlocking {
         //send http request

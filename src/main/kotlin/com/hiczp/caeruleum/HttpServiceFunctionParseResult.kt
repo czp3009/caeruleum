@@ -9,18 +9,18 @@ import io.ktor.util.reflect.*
 //no need to override hashcode and equals since never use this class as the key of Map
 @Suppress("ArrayInDataClass", "MemberVisibilityCanBePrivate")
 internal data class HttpServiceFunctionParseResult(
-    val isSuspend: Boolean,
-    val returnTypeIsJob: Boolean,
-    val realReturnTypeInfo: TypeInfo,
-    val actions: Array<out List<HttpRequestBuilder.(value: Any) -> Unit>>,
-    val classLevelBaseUrl: String?,
-    val functionLevelAttributes: Iterable<Pair<AttributeKey<String>, String>>,
-    val functionLevelHeaders: HeadersBuilder,
-    val functionLevelPath: String,
-    val httpMethod: HttpMethod,
-    val isFormUrlEncoded: Boolean,
-    val isMultipart: Boolean,
-    val programmaticallyBaseUrl: String?
+        val isSuspend: Boolean,
+        val returnTypeIsJob: Boolean,
+        val realReturnTypeInfo: TypeInfo,
+        val actions: Array<out List<HttpRequestBuilder.(value: Any) -> Unit>>,
+        val classLevelBaseUrl: String?,
+        val functionLevelAttributes: Iterable<Pair<AttributeKey<String>, String>>,
+        val functionLevelHeaders: HeadersBuilder,
+        val functionLevelPath: String,
+        val httpMethod: HttpMethod,
+        val isFormUrlEncoded: Boolean,
+        val isMultipart: Boolean,
+        val programmaticallyBaseUrl: String?
 ) {
     val isBlocking = !isSuspend && !returnTypeIsJob
     val functionLevelPathIsAbsolute = functionLevelPath.startsWith('/')
@@ -53,6 +53,7 @@ internal data class HttpServiceFunctionParseResult(
                 preAction = { setBody(ParametersBuilder()) }
                 postAction = { setBody(FormDataContent((body as ParametersBuilder).build())) }
             }
+
             isMultipart -> {
                 preAction = { setBody(mutableListOf<FormPart<*>>()) }
                 @Suppress("UNCHECKED_CAST")
@@ -60,6 +61,7 @@ internal data class HttpServiceFunctionParseResult(
                     setBody(MultiPartFormDataContent(formData(*(body as List<FormPart<*>>).toTypedArray())))
                 }
             }
+
             else -> {
                 preAction = {}
                 postAction = {}
@@ -68,23 +70,23 @@ internal data class HttpServiceFunctionParseResult(
     }
 
     fun generateHttpRequestBuilder(args: Array<out Any?>) =
-        HttpRequestBuilder().apply {
-            //init
-            functionLevelAttributes.forEach { (key, value) ->
-                attributes.put(key, value)
-            }
-            headers.appendAll(functionLevelHeaders)
-            method = httpMethod
-            //execute actions
-            url.apply(baseUrlAction)
-            preAction()
-            args.forEachIndexed { index, arg ->
-                if (arg != null) {
-                    actions[index].forEach {
-                        it(arg)
+            HttpRequestBuilder().apply {
+                //init
+                functionLevelAttributes.forEach { (key, value) ->
+                    attributes.put(key, value)
+                }
+                headers.appendAll(functionLevelHeaders)
+                method = httpMethod
+                //execute actions
+                url.apply(baseUrlAction)
+                preAction()
+                args.forEachIndexed { index, arg ->
+                    if (arg != null) {
+                        actions[index].forEach {
+                            it(arg)
+                        }
                     }
                 }
+                postAction()
             }
-            postAction()
-        }
 }

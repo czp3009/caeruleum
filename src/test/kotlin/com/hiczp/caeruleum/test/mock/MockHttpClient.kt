@@ -1,14 +1,15 @@
 package com.hiczp.caeruleum.test.mock
 
-import com.github.salomonbrys.kotson.jsonObject
 import com.hiczp.caeruleum.Caeruleum
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 fun createMockHttpClient() = HttpClient(MockEngine) {
     engine {
@@ -21,6 +22,7 @@ fun createMockHttpClient() = HttpClient(MockEngine) {
                         headersOf(HttpHeaders.ContentType, contentType.toString())
                     } ?: Headers.Empty
                 )
+
                 "/returnEncodedPath" -> respondOk(it.url.encodedPath)
                 "/returnUrl" -> respondOk(it.url.toString())
                 "/returnHost" -> respondOk(it.url.host)
@@ -40,13 +42,13 @@ fun createMockHttpClient() = HttpClient(MockEngine) {
                 //other request
                 else -> respond(
                     content = ByteReadChannel(
-                        jsonObject(
-                            "header" to it.headers.toString(),
-                            "method" to it.method.value,
-                            "url" to it.url.toString(),
-                            "contentLength" to it.body.contentLength,
-                            "body" to it.body.toByteReadPacket().readText()
-                        ).toString()
+                            buildJsonObject {
+                                put("header", it.headers.toString())
+                                put("method", it.method.value)
+                                put("url", it.url.toString())
+                                put("contentLength", it.body.contentLength)
+                                put("body", it.body.toByteReadPacket().readText())
+                            }.toString()
                     ),
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 )
@@ -55,7 +57,7 @@ fun createMockHttpClient() = HttpClient(MockEngine) {
     }
 
     install(ContentNegotiation) {
-        gson()
+        json()
     }
     install(Logging) {
         level = LogLevel.ALL
