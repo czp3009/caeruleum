@@ -12,16 +12,13 @@ import kotlin.reflect.full.allSuperclasses
  * @param useCache save resolved ServiceFunction and reuse it, default is true
  */
 class Caeruleum(useCache: Boolean = true) {
-    private val resolveServiceFunction: (method: Method, parse: (method: Method) -> ServiceFunction) -> ServiceFunction
-
-    init {
-        resolveServiceFunction = if (useCache) {
+    private val resolveServiceFunction: (method: Method, parse: (method: Method) -> ServiceFunction) -> ServiceFunction =
+        if (useCache) {
             val cachedServiceFunctions = ConcurrentHashMap<Method, ServiceFunction>()
             ({ method, parse -> cachedServiceFunctions.computeIfAbsent(method) { parse(it) } })
         } else {
             { method, parse -> parse(method) }
         }
-    }
 
     /**
      * Create ServiceInterface implementation

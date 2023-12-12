@@ -14,7 +14,7 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
 internal sealed interface ServiceFunction : InvocationHandler
 
-internal object DelegationServiceFunction : ServiceFunction {
+internal data object DelegationServiceFunction : ServiceFunction {
     override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any? = method(proxy, *args.orEmpty())
 }
 
