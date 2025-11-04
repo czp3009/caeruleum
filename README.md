@@ -5,6 +5,11 @@ Retrofit inspired Http client base on ktor-client.
 Note: Please first consider using the [Resources](https://ktor.io/docs/type-safe-request.html) plugin maintained by
 Jetbrains.
 
+Warning: Caeruleum is a side project that may contain critical bugs, and its API may be unstable. Use at your own risk.
+
+Suggestion: More powerful, stable, and multiplatform Retrofit-like HTTP
+client: [Ktorfit](https://github.com/Foso/Ktorfit)
+
 # Gradle
 
 ```groovy
